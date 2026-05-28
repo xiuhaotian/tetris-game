@@ -723,7 +723,6 @@ onMounted(() => {
   
   window.addEventListener('keydown', handleKeydown)
   document.addEventListener('touchmove', preventScroll, { passive: false })
-  document.addEventListener('touchstart', preventScroll, { passive: false })
   document.addEventListener('wheel', preventScroll, { passive: false })
   
   const gameArea = document.querySelector('.game-area')
@@ -736,7 +735,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   document.removeEventListener('touchmove', preventScroll)
-  document.removeEventListener('touchstart', preventScroll)
   document.removeEventListener('wheel', preventScroll)
   cancelAnimationFrame(gameFrameId)
   cancelAnimationFrame(bgFrameId)
