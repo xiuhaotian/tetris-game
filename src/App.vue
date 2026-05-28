@@ -161,6 +161,7 @@ let dropInterval = 1000
 let lastDropTime = 0
 let particles = []
 let stars = []
+let touchStartX = 0, touchStartY = 0, touchStartTime = 0
 let comboTimer = null
 
 const BOARD_WIDTH = 10
@@ -475,11 +476,11 @@ const rotate = () => {
 
 const moveLeft = () => { if (currentPiece && isPlaying.value && !collides(currentPiece, -1, 0)) currentPiece.x-- }
 const moveRight = () => { if (currentPiece && isPlaying.value && !collides(currentPiece, 1, 0)) currentPiece.x++ }
-const drop = () => { if (currentPiece && isPlaying.value && !collides(currentPiece, 0, 1)) currentPiece.y++ }
-const hardDrop = () => {
+const drop = () => {
   if (!currentPiece || !isPlaying.value) return
   while (!collides(currentPiece, 0, 1)) { currentPiece.y++; score.value += 2 }
 }
+const softDrop = () => { if (currentPiece && isPlaying.value && !collides(currentPiece, 0, 1)) currentPiece.y++; score.value += 1 }
 
 const moveDown = () => {
   if (!isPlaying.value) return
@@ -592,7 +593,47 @@ const handleKeydown = (e) => {
     case 'ArrowRight': e.preventDefault(); moveRight(); break
     case 'ArrowDown': e.preventDefault(); drop(); break
     case 'ArrowUp': e.preventDefault(); rotate(); break
-    case 'Space': e.preventDefault(); hardDrop(); break
+    case 'Space': e.preventDefault(); drop(); break
+    case 'KeyS': e.preventDefault(); softDrop(); break
+    case 'KeyW': e.preventDefault(); rotate(); break
+    case 'KeyA': e.preventDefault(); moveLeft(); break
+    case 'KeyD': e.preventDefault(); moveRight(); break
+  }
+}
+
+const handleTouchStart = (e) => {
+  touchStartX = e.touches[0].clientX
+  touchStartY = e.touches[0].clientY
+  touchStartTime = Date.now()
+}
+
+const handleTouchEnd = (e) => {
+  if (!isPlaying.value) return
+  
+  const touchEndX = e.changedTouches[0].clientX
+  const touchEndY = e.changedTouches[0].clientY
+  const touchDuration = Date.now() - touchStartTime
+  
+  const deltaX = touchEndX - touchStartX
+  const deltaY = touchEndY - touchStartY
+  const minSwipeDistance = 30
+  const maxTapDuration = 200
+  
+  if (touchDuration < maxTapDuration && Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
+    rotate()
+    return
+  }
+  
+  if (Math.abs(deltaX) > Math.abs(deltaY)) {
+    if (Math.abs(deltaX) > minSwipeDistance) {
+      if (deltaX > 0) moveRight()
+      else moveLeft()
+    }
+  } else {
+    if (Math.abs(deltaY) > minSwipeDistance) {
+      if (deltaY > 0) drop()
+      else softDrop()
+    }
   }
 }
 
@@ -610,6 +651,12 @@ onMounted(() => {
   checkMobile()
   
   window.addEventListener('keydown', handleKeydown)
+  
+  const gameArea = document.querySelector('.game-area')
+  if (gameArea) {
+    gameArea.addEventListener('touchstart', handleTouchStart, { passive: true })
+    gameArea.addEventListener('touchend', handleTouchEnd, { passive: true })
+  }
 })
 
 onUnmounted(() => {
@@ -617,6 +664,12 @@ onUnmounted(() => {
   cancelAnimationFrame(gameFrameId)
   cancelAnimationFrame(bgFrameId)
   if (comboTimer) clearTimeout(comboTimer)
+  
+  const gameArea = document.querySelector('.game-area')
+  if (gameArea) {
+    gameArea.removeEventListener('touchstart', handleTouchStart)
+    gameArea.removeEventListener('touchend', handleTouchEnd)
+  }
 })
 </script>
 
