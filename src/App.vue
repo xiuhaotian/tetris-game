@@ -15,7 +15,6 @@
           <span class="title-icon">✨</span>
         </h1>
         <p class="game-subtitle">T E T R I S</p>
-        <div class="title-glow"></div>
       </div>
       
       <div class="game-area">
@@ -26,7 +25,6 @@
               <div class="stat-label">{{ t('score') }}</div>
               <div class="stat-value score">{{ displayScore.toLocaleString() }}</div>
             </div>
-            <div class="stat-glow score-glow"></div>
           </div>
           
           <div class="stat-card level-card">
@@ -35,7 +33,6 @@
               <div class="stat-label">{{ t('level') }}</div>
               <div class="stat-value level">{{ level }}</div>
             </div>
-            <div class="stat-glow level-glow"></div>
           </div>
           
           <div class="stat-card lines-card">
@@ -44,7 +41,6 @@
               <div class="stat-label">{{ t('lines') }}</div>
               <div class="stat-value lines">{{ lines }}</div>
             </div>
-            <div class="stat-glow lines-glow"></div>
           </div>
           
           <div class="stat-card highscore-card">
@@ -53,48 +49,33 @@
               <div class="stat-label">{{ t('highscore') }}</div>
               <div class="stat-value highscore">{{ highScore.toLocaleString() }}</div>
             </div>
-            <div class="stat-glow highscore-glow"></div>
           </div>
           
           <div class="combo-display" v-if="combo > 1">
             <div class="combo-text">{{ combo }}x COMBO!</div>
-            <div class="combo-particles"></div>
           </div>
         </div>
         
         <div class="board-section">
-          <div class="board-3d-container">
-            <div class="board-perspective">
-              <div class="board-frame glass-panel">
-                <div class="board-inner">
-                  <canvas ref="gameCanvas" width="320" height="640"></canvas>
-                  <div class="board-scanline"></div>
-                </div>
-                <div class="board-glow-effect"></div>
-              </div>
-            </div>
+          <div class="board-wrapper">
+            <canvas ref="gameCanvas" width="320" height="640"></canvas>
           </div>
           
           <button class="start-btn glass-btn" @click="startGame" v-if="!isPlaying && !gameOver">
             <span class="btn-icon">▶</span>
             <span class="btn-text">{{ t('start') }}</span>
-            <div class="btn-particles"></div>
           </button>
           
           <button class="start-btn glass-btn restart" @click="startGame" v-if="gameOver">
             <span class="btn-icon">↻</span>
             <span class="btn-text">{{ t('restart') }}</span>
-            <div class="btn-particles"></div>
           </button>
         </div>
         
         <div class="right-panel glass-panel">
           <div class="next-piece-container">
             <div class="next-label">{{ t('next') }}</div>
-            <div class="next-canvas-wrapper">
-              <canvas ref="nextCanvas" width="140" height="140"></canvas>
-              <div class="next-glow"></div>
-            </div>
+            <canvas ref="nextCanvas" width="120" height="120"></canvas>
           </div>
           
           <div class="controls-section">
@@ -151,11 +132,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const gameCanvas = ref(null)
 const nextCanvas = ref(null)
-const gameWrapper = ref(null)
 const bgCanvas = ref(null)
 
 const score = ref(0)
@@ -173,17 +153,14 @@ const currentLang = ref('zh')
 const showComboEffect = ref(false)
 const comboEffectText = ref('')
 
-let ctx = null
-let nextCtx = null
-let bgCtx = null
-let gameLoop = null
-let bgAnimationFrame = null
-let currentPiece = null
-let nextPiece = null
+let ctx = null, nextCtx = null, bgCtx = null
+let gameFrameId = null, bgFrameId = null
+let currentPiece = null, nextPiece = null
 let board = []
 let dropInterval = 1000
-let particlesArray = []
-let starsArray = []
+let lastDropTime = 0
+let particles = []
+let stars = []
 let comboTimer = null
 
 const BOARD_WIDTH = 10
@@ -235,58 +212,16 @@ const translations = {
   }
 }
 
-const t = computed(() => (key) => translations[currentLang.value][key] || key)
+const t = (key) => translations[currentLang.value][key] || key
 
 const COLORS = {
-  I: { 
-    main: '#00f5ff', 
-    light: '#80fcff', 
-    dark: '#00b8c4', 
-    glow: 'rgba(0, 245, 255, 0.8)',
-    gradient: ['#00f5ff', '#00d4e0', '#00a8b8']
-  },
-  O: { 
-    main: '#ffd700', 
-    light: '#ffed80', 
-    dark: '#cca300', 
-    glow: 'rgba(255, 215, 0, 0.8)',
-    gradient: ['#ffd700', '#e6c200', '#b89900']
-  },
-  T: { 
-    main: '#bf5fff', 
-    light: '#d98fff', 
-    dark: '#9933ff', 
-    glow: 'rgba(191, 95, 255, 0.8)',
-    gradient: ['#bf5fff', '#9933ff', '#7a00e6']
-  },
-  S: { 
-    main: '#00ff88', 
-    light: '#66ffaa', 
-    dark: '#00cc66', 
-    glow: 'rgba(0, 255, 136, 0.8)',
-    gradient: ['#00ff88', '#00e673', '#00b359']
-  },
-  Z: { 
-    main: '#ff4757', 
-    light: '#ff6b7a', 
-    dark: '#cc3945', 
-    glow: 'rgba(255, 71, 87, 0.8)',
-    gradient: ['#ff4757', '#e63946', '#cc2936']
-  },
-  J: { 
-    main: '#4a90ff', 
-    light: '#7aadff', 
-    dark: '#3373cc', 
-    glow: 'rgba(74, 144, 255, 0.8)',
-    gradient: ['#4a90ff', '#3373e6', '#1a52cc']
-  },
-  L: { 
-    main: '#ff9f43', 
-    light: '#ffb86c', 
-    dark: '#cc7f36', 
-    glow: 'rgba(255, 159, 67, 0.8)',
-    gradient: ['#ff9f43', '#e68a3d', '#cc7030']
-  },
+  I: { main: '#00f5ff', dark: '#00a8b8', glow: '#00f5ff' },
+  O: { main: '#ffd700', dark: '#b89900', glow: '#ffd700' },
+  T: { main: '#bf5fff', dark: '#7a00e6', glow: '#bf5fff' },
+  S: { main: '#00ff88', dark: '#00b359', glow: '#00ff88' },
+  Z: { main: '#ff4757', dark: '#cc2936', glow: '#ff4757' },
+  J: { main: '#4a90ff', dark: '#1a52cc', glow: '#4a90ff' },
+  L: { main: '#ff9f43', dark: '#cc7030', glow: '#ff9f43' }
 }
 
 const PIECES = [
@@ -296,280 +231,64 @@ const PIECES = [
   { type: 'S', shape: [[0,1,1],[1,1,0]], color: COLORS.S },
   { type: 'Z', shape: [[1,1,0],[0,1,1]], color: COLORS.Z },
   { type: 'J', shape: [[1,0,0],[1,1,1]], color: COLORS.J },
-  { type: 'L', shape: [[0,0,1],[1,1,1]], color: COLORS.L },
+  { type: 'L', shape: [[0,0,1],[1,1,1]], color: COLORS.L }
 ]
 
-class Star {
-  constructor(canvas) {
-    this.x = Math.random() * canvas.width
-    this.y = Math.random() * canvas.height
-    this.size = Math.random() * 2 + 0.5
-    this.speed = Math.random() * 0.5 + 0.1
-    this.opacity = Math.random()
-    this.twinkleSpeed = Math.random() * 0.02 + 0.01
-    this.color = this.getStarColor()
-  }
-  
-  getStarColor() {
-    const colors = [
-      'rgba(255, 255, 255, 1)',
-      'rgba(200, 220, 255, 1)',
-      'rgba(255, 240, 200, 1)',
-      'rgba(255, 200, 255, 1)',
-      'rgba(200, 255, 255, 1)',
-    ]
-    return colors[Math.floor(Math.random() * colors.length)]
-  }
-  
-  update(canvas) {
-    this.opacity += this.twinkleSpeed
-    if (this.opacity > 1 || this.opacity < 0.3) {
-      this.twinkleSpeed = -this.twinkleSpeed
-    }
-    this.y += this.speed
-    if (this.y > canvas.height) {
-      this.y = 0
-      this.x = Math.random() * canvas.width
-    }
-  }
-  
-  draw(ctx) {
-    ctx.save()
-    ctx.globalAlpha = this.opacity
-    ctx.fillStyle = this.color
-    ctx.shadowBlur = this.size * 3
-    ctx.shadowColor = this.color
-    ctx.beginPath()
-    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.restore()
-  }
-}
-
-class Particle3D {
-  constructor(x, y, color) {
-    this.x = x
-    this.y = y
-    this.color = color
-    this.size = Math.random() * 8 + 4
-    this.speedX = (Math.random() - 0.5) * 12
-    this.speedY = (Math.random() - 0.5) * 12 - 5
-    this.gravity = 0.4
-    this.life = 1
-    this.decay = 0.015 + Math.random() * 0.01
-    this.rotation = Math.random() * Math.PI * 2
-    this.rotationSpeed = (Math.random() - 0.5) * 0.3
-    this.trail = []
-  }
-  
-  update() {
-    this.trail.push({ x: this.x, y: this.y, life: 0.5 })
-    if (this.trail.length > 8) {
-      this.trail.shift()
-    }
-    
-    this.x += this.speedX
-    this.y += this.speedY
-    this.speedY += this.gravity
-    this.life -= this.decay
-    this.rotation += this.rotationSpeed
-    
-    this.trail.forEach(t => t.life -= 0.05)
-  }
-  
-  draw(ctx) {
-    ctx.save()
-    
-    this.trail.forEach((t, i) => {
-      ctx.globalAlpha = t.life * 0.3
-      ctx.fillStyle = this.color
-      ctx.beginPath()
-      ctx.arc(t.x, t.y, this.size * 0.3, 0, Math.PI * 2)
-      ctx.fill()
-    })
-    
-    ctx.globalAlpha = this.life
-    ctx.translate(this.x, this.y)
-    ctx.rotate(this.rotation)
-    
-    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.size)
-    gradient.addColorStop(0, this.color)
-    gradient.addColorStop(0.5, this.color)
-    gradient.addColorStop(1, 'transparent')
-    
-    ctx.fillStyle = gradient
-    ctx.shadowBlur = 20
-    ctx.shadowColor = this.color
-    ctx.beginPath()
-    ctx.arc(0, 0, this.size, 0, Math.PI * 2)
-    ctx.fill()
-    
-    ctx.restore()
-  }
-}
-
-class LineClearEffect {
-  constructor(y, colors) {
-    this.y = y
-    this.colors = colors
-    this.progress = 0
-    this.speed = 0.1
-    this.particles = []
-  }
-  
-  update() {
-    this.progress += this.speed
-    
-    if (this.progress > 0.3 && this.particles.length < 100) {
-      const color = this.colors[Math.floor(Math.random() * this.colors.length)]
-      const x = Math.random() * (BOARD_WIDTH * BLOCK_SIZE)
-      this.particles.push(new Particle3D(x, this.y * BLOCK_SIZE + 16, color))
-    }
-    
-    this.particles = this.particles.filter(p => {
-      p.update()
-      return p.life > 0
-    })
-  }
-  
-  draw(ctx) {
-    if (this.progress < 1) {
-      const width = BOARD_WIDTH * BLOCK_SIZE * this.progress
-      const startX = (BOARD_WIDTH * BLOCK_SIZE - width) / 2
-      const gradient = ctx.createLinearGradient(startX, 0, startX + width, 0)
-      gradient.addColorStop(0, 'transparent')
-      gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.8)')
-      gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.8)')
-      gradient.addColorStop(1, 'transparent')
-      
-      ctx.save()
-      ctx.fillStyle = gradient
-      ctx.fillRect(startX, this.y * BLOCK_SIZE, width, BLOCK_SIZE)
-      ctx.restore()
-    }
-    
-    this.particles.forEach(p => p.draw(ctx))
-  }
-  
-  isDone() {
-    return this.progress > 1.5 && this.particles.length === 0
-  }
-}
-
-let lineClearEffects = []
-
 const initBoard = () => {
-  board = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0))
+  board = Array.from({ length: BOARD_HEIGHT }, () => Array(BOARD_WIDTH).fill(0))
 }
 
 const createPiece = () => {
   const piece = PIECES[Math.floor(Math.random() * PIECES.length)]
   return {
-    type: piece.type,
+    ...piece,
     shape: piece.shape.map(row => [...row]),
-    color: piece.color,
     x: Math.floor((BOARD_WIDTH - piece.shape[0].length) / 2),
-    y: 0,
-    rotation: 0
+    y: 0
   }
 }
 
-const drawBlock3D = (ctx, x, y, colorSet, size = BLOCK_SIZE, alpha = 1, isGhost = false) => {
-  const px = x * size
-  const py = y * size
+const drawBlock = (context, x, y, color, alpha = 1) => {
+  const px = x * BLOCK_SIZE
+  const py = y * BLOCK_SIZE
   
-  ctx.save()
-  ctx.globalAlpha = alpha
+  context.save()
+  context.globalAlpha = alpha
   
-  if (!isGhost) {
-    ctx.shadowBlur = 20
-    ctx.shadowColor = colorSet.glow
+  if (alpha === 1) {
+    context.shadowColor = color.glow
+    context.shadowBlur = 15
   }
   
-  const gradient = ctx.createLinearGradient(px, py, px + size, py + size)
-  gradient.addColorStop(0, colorSet.gradient[0])
-  gradient.addColorStop(0.5, colorSet.gradient[1])
-  gradient.addColorStop(1, colorSet.gradient[2])
+  const gradient = context.createLinearGradient(px, py, px + BLOCK_SIZE, py + BLOCK_SIZE)
+  gradient.addColorStop(0, color.main)
+  gradient.addColorStop(1, color.dark)
   
-  ctx.fillStyle = gradient
-  ctx.beginPath()
-  ctx.roundRect(px + 2, py + 2, size - 4, size - 4, 6)
-  ctx.fill()
+  context.fillStyle = gradient
+  context.beginPath()
+  context.roundRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4, 4)
+  context.fill()
   
-  if (!isGhost) {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
-    ctx.beginPath()
-    ctx.roundRect(px + 4, py + 4, size - 10, 6, 3)
-    ctx.fill()
-    
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)'
-    ctx.beginPath()
-    ctx.roundRect(px + 4, py + size - 10, size - 8, 6, 3)
-    ctx.fill()
-    
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'
-    ctx.beginPath()
-    ctx.roundRect(px + 4, py + 4, 6, size - 8, 3)
-    ctx.fill()
+  if (alpha === 1) {
+    context.fillStyle = 'rgba(255,255,255,0.3)'
+    context.fillRect(px + 4, py + 4, BLOCK_SIZE - 8, 3)
   }
   
-  ctx.restore()
+  context.restore()
 }
 
-const drawBoard = () => {
-  ctx.fillStyle = 'rgba(5, 5, 10, 0.95)'
+const drawBoard = (timestamp) => {
+  ctx.fillStyle = '#0a0a15'
   ctx.fillRect(0, 0, BOARD_WIDTH * BLOCK_SIZE, BOARD_HEIGHT * BLOCK_SIZE)
-  
-  const gridGradient = ctx.createLinearGradient(0, 0, 0, BOARD_HEIGHT * BLOCK_SIZE)
-  gridGradient.addColorStop(0, 'rgba(30, 30, 50, 0.1)')
-  gridGradient.addColorStop(1, 'rgba(20, 20, 40, 0.2)')
-  ctx.fillStyle = gridGradient
-  ctx.fillRect(0, 0, BOARD_WIDTH * BLOCK_SIZE, BOARD_HEIGHT * BLOCK_SIZE)
-  
-  for (let y = 0; y < BOARD_HEIGHT; y++) {
-    ctx.strokeStyle = 'rgba(100, 100, 150, 0.1)'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(0, y * BLOCK_SIZE)
-    ctx.lineTo(BOARD_WIDTH * BLOCK_SIZE, y * BLOCK_SIZE)
-    ctx.stroke()
-  }
-  
-  for (let x = 0; x < BOARD_WIDTH; x++) {
-    ctx.strokeStyle = 'rgba(100, 100, 150, 0.1)'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(x * BLOCK_SIZE, 0)
-    ctx.lineTo(x * BLOCK_SIZE, BOARD_HEIGHT * BLOCK_SIZE)
-    ctx.stroke()
-  }
   
   for (let y = 0; y < BOARD_HEIGHT; y++) {
     for (let x = 0; x < BOARD_WIDTH; x++) {
       if (board[y][x]) {
-        const colorKey = Object.keys(COLORS).find(k => 
-          COLORS[k].main === board[y][x] || 
-          COLORS[k].gradient[0] === board[y][x]
-        )
-        if (colorKey) {
-          drawBlock3D(ctx, x, y, COLORS[colorKey])
-        } else {
-          const defaultColor = {
-            main: board[y][x],
-            gradient: [board[y][x], board[y][x], board[y][x]],
-            glow: board[y][x]
-          }
-          drawBlock3D(ctx, x, y, defaultColor)
-        }
+        const colorKey = Object.keys(COLORS).find(k => COLORS[k].main === board[y][x])
+        if (colorKey) drawBlock(ctx, x, y, COLORS[colorKey])
       }
     }
   }
-  
-  lineClearEffects = lineClearEffects.filter(effect => {
-    effect.update()
-    effect.draw(ctx)
-    return !effect.isDone()
-  })
   
   if (currentPiece) {
     const ghostY = getGhostPosition()
@@ -577,16 +296,11 @@ const drawBoard = () => {
       row.forEach((cell, x) => {
         if (cell) {
           ctx.save()
-          ctx.globalAlpha = 0.15
           ctx.strokeStyle = currentPiece.color.main
+          ctx.globalAlpha = 0.3
           ctx.lineWidth = 2
           ctx.setLineDash([4, 4])
-          ctx.strokeRect(
-            (x + currentPiece.x) * BLOCK_SIZE + 4,
-            (y + ghostY) * BLOCK_SIZE + 4,
-            BLOCK_SIZE - 8,
-            BLOCK_SIZE - 8
-          )
+          ctx.strokeRect((x + currentPiece.x) * BLOCK_SIZE + 4, (y + ghostY) * BLOCK_SIZE + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8)
           ctx.restore()
         }
       })
@@ -594,92 +308,92 @@ const drawBoard = () => {
     
     currentPiece.shape.forEach((row, y) => {
       row.forEach((cell, x) => {
-        if (cell) {
-          drawBlock3D(ctx, x + currentPiece.x, y + currentPiece.y, currentPiece.color)
-        }
+        if (cell) drawBlock(ctx, x + currentPiece.x, y + currentPiece.y, currentPiece.color)
       })
     })
+  }
+  
+  particles = particles.filter(p => {
+    p.life -= 0.02
+    if (p.life > 0) {
+      p.x += p.vx
+      p.y += p.vy
+      p.vy += 0.3
+      
+      ctx.save()
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      ctx.shadowColor = p.color
+      ctx.shadowBlur = 10
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+      return true
+    }
+    return false
+  })
+  
+  if (isPlaying.value && timestamp - lastDropTime >= dropInterval) {
+    moveDown()
+    lastDropTime = timestamp
+  }
+  
+  if (displayScore.value < score.value) {
+    displayScore.value += Math.ceil((score.value - displayScore.value) / 5)
   }
 }
 
 const getGhostPosition = () => {
   if (!currentPiece) return 0
   let ghostY = currentPiece.y
-  while (!collides(currentPiece, 0, ghostY - currentPiece.y + 1)) {
-    ghostY++
-  }
+  while (!collides(currentPiece, 0, ghostY - currentPiece.y + 1)) ghostY++
   return ghostY
 }
 
 const drawNextPiece = () => {
-  nextCtx.fillStyle = 'rgba(10, 10, 20, 0.8)'
-  nextCtx.fillRect(0, 0, 140, 140)
+  nextCtx.fillStyle = '#0a0a15'
+  nextCtx.fillRect(0, 0, 120, 120)
   
-  if (nextPiece) {
-    const blockSize = 30
-    const offsetX = (140 - nextPiece.shape[0].length * blockSize) / 2
-    const offsetY = (140 - nextPiece.shape.length * blockSize) / 2
-    
-    nextPiece.shape.forEach((row, y) => {
-      row.forEach((cell, x) => {
-        if (cell) {
-          const color = nextPiece.color
-          const px = offsetX + x * blockSize
-          const py = offsetY + y * blockSize
-          
-          nextCtx.shadowBlur = 15
-          nextCtx.shadowColor = color.glow
-          
-          const gradient = nextCtx.createLinearGradient(px, py, px + blockSize, py + blockSize)
-          gradient.addColorStop(0, color.gradient[0])
-          gradient.addColorStop(1, color.gradient[2])
-          
-          nextCtx.fillStyle = gradient
-          nextCtx.beginPath()
-          nextCtx.roundRect(px + 2, py + 2, blockSize - 4, blockSize - 4, 4)
-          nextCtx.fill()
-          
-          nextCtx.fillStyle = 'rgba(255, 255, 255, 0.3)'
-          nextCtx.beginPath()
-          nextCtx.roundRect(px + 3, py + 3, blockSize - 8, 4, 2)
-          nextCtx.fill()
-        }
-      })
+  if (!nextPiece) return
+  
+  const blockSize = 24
+  const offsetX = (120 - nextPiece.shape[0].length * blockSize) / 2
+  const offsetY = (120 - nextPiece.shape.length * blockSize) / 2
+  
+  nextPiece.shape.forEach((row, y) => {
+    row.forEach((cell, x) => {
+      if (cell) {
+        const color = nextPiece.color
+        const px = offsetX + x * blockSize
+        const py = offsetY + y * blockSize
+        
+        nextCtx.shadowColor = color.glow
+        nextCtx.shadowBlur = 10
+        
+        const gradient = nextCtx.createLinearGradient(px, py, px + blockSize, py + blockSize)
+        gradient.addColorStop(0, color.main)
+        gradient.addColorStop(1, color.dark)
+        
+        nextCtx.fillStyle = gradient
+        nextCtx.beginPath()
+        nextCtx.roundRect(px + 1, py + 1, blockSize - 2, blockSize - 2, 3)
+        nextCtx.fill()
+      }
     })
-  }
-}
-
-const createParticles3D = (x, y, color, count = 15) => {
-  for (let i = 0; i < count; i++) {
-    const px = x * BLOCK_SIZE + BLOCK_SIZE / 2
-    const py = y * BLOCK_SIZE + BLOCK_SIZE / 2
-    particlesArray.push(new Particle3D(px, py, color))
-  }
-}
-
-const updateParticles = () => {
-  particlesArray = particlesArray.filter(p => p.life > 0)
-  particlesArray.forEach(p => {
-    p.update()
-    p.draw(ctx)
   })
 }
 
-const collides = (piece, offsetX, offsetY, newShape) => {
-  const shape = newShape || piece.shape
-  for (let y = 0; y < shape.length; y++) {
-    for (let x = 0; x < shape[y].length; x++) {
-      if (shape[y][x]) {
+const collides = (piece, offsetX, offsetY, shape) => {
+  const s = shape || piece.shape
+  for (let y = 0; y < s.length; y++) {
+    for (let x = 0; x < s[y].length; x++) {
+      if (s[y][x]) {
         const newX = x + piece.x + offsetX
         const newY = y + piece.y + offsetY
         
-        if (newX < 0 || newX >= BOARD_WIDTH || newY >= BOARD_HEIGHT) {
-          return true
-        }
-        
-        if (newY >= 0 && board[newY][newX]) {
-          return true
-        }
+        if (newX < 0 || newX >= BOARD_WIDTH || newY >= BOARD_HEIGHT) return true
+        if (newY >= 0 && board[newY][newX]) return true
       }
     }
   }
@@ -690,119 +404,81 @@ const mergePiece = () => {
   currentPiece.shape.forEach((row, y) => {
     row.forEach((cell, x) => {
       if (cell) {
-        board[y + currentPiece.y][x + currentPiece.x] = currentPiece.color.gradient[0]
-        createParticles3D(x + currentPiece.x, y + currentPiece.y, currentPiece.color.main, 5)
+        board[y + currentPiece.y][x + currentPiece.x] = currentPiece.color.main
+        for (let i = 0; i < 3; i++) {
+          particles.push({
+            x: (x + currentPiece.x) * BLOCK_SIZE + BLOCK_SIZE / 2,
+            y: (y + currentPiece.y) * BLOCK_SIZE + BLOCK_SIZE / 2,
+            vx: (Math.random() - 0.5) * 6,
+            vy: (Math.random() - 0.5) * 6 - 2,
+            size: Math.random() * 4 + 2,
+            color: currentPiece.color.main,
+            life: 1
+          })
+        }
       }
     })
   })
 }
 
 const clearLines = () => {
-  let clearedCount = 0
-  let clearedColors = []
+  let cleared = 0
+  const clearedColors = []
   
   for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
     if (board[y].every(cell => cell !== 0)) {
-      clearedColors = [...clearedColors, ...board[y].filter(c => c !== 0)]
-      lineClearEffects.push(new LineClearEffect(y, clearedColors))
-      
+      clearedColors.push(...board[y].filter(c => c !== 0))
       board.splice(y, 1)
       board.unshift(Array(BOARD_WIDTH).fill(0))
-      clearedCount++
+      cleared++
       y++
     }
   }
   
-  if (clearedCount > 0) {
+  if (cleared > 0) {
     combo.value++
-    
     if (comboTimer) clearTimeout(comboTimer)
-    comboTimer = setTimeout(() => {
-      combo.value = 0
-    }, 2000)
+    comboTimer = setTimeout(() => combo.value = 0, 2000)
     
     const pointsTable = [0, 100, 300, 500, 800]
-    const comboBonus = combo.value > 1 ? combo.value * 0.5 : 1
-    const points = Math.floor(pointsTable[Math.min(clearedCount, 4)] * level.value * comboBonus)
-    score.value += points
+    const points = pointsTable[Math.min(cleared, 4)] * level.value * (combo.value > 1 ? combo.value * 0.5 : 1)
+    score.value += Math.floor(points)
     
-    lines.value += clearedCount
+    lines.value += cleared
     level.value = Math.floor(lines.value / 10) + 1
     dropInterval = Math.max(100, 1000 - (level.value - 1) * 80)
     
     if (score.value > highScore.value) {
       highScore.value = score.value
       localStorage.setItem('tetrisHighScore', highScore.value.toString())
-      
-      if (!achievements.value.includes(t.value('newRecord'))) {
-        achievements.value.push(t.value('newRecord'))
-      }
+      if (!achievements.value.includes(t('newRecord'))) achievements.value.push(t('newRecord'))
     }
     
-    if (lines.value >= 10 && !achievements.value.includes(t.value('lines10'))) {
-      achievements.value.push(t.value('lines10'))
-    }
-    if (lines.value >= 50 && !achievements.value.includes(t.value('lines50'))) {
-      achievements.value.push(t.value('lines50'))
-    }
+    if (lines.value >= 10 && !achievements.value.includes(t('lines10'))) achievements.value.push(t('lines10'))
+    if (lines.value >= 50 && !achievements.value.includes(t('lines50'))) achievements.value.push(t('lines50'))
     
     if (combo.value > 1) {
       showComboEffect.value = true
-      comboEffectText.value = `${combo.value}x COMBO! +${points}`
-      setTimeout(() => {
-        showComboEffect.value = false
-      }, 1000)
-    }
-    
-    if (gameLoop) {
-      clearInterval(gameLoop)
-      gameLoop = setInterval(update, dropInterval)
+      comboEffectText.value = `${combo.value}x COMBO! +${Math.floor(points)}`
+      setTimeout(() => showComboEffect.value = false, 800)
     }
   }
 }
 
 const rotate = () => {
   if (!currentPiece || !isPlaying.value) return
-  
-  const rotated = currentPiece.shape[0].map((_, i) =>
-    currentPiece.shape.map(row => row[i]).reverse()
-  )
-  
-  if (!collides(currentPiece, 0, 0, rotated)) {
-    currentPiece.shape = rotated
-  } else if (!collides(currentPiece, 1, 0, rotated)) {
-    currentPiece.x++
-    currentPiece.shape = rotated
-  } else if (!collides(currentPiece, -1, 0, rotated)) {
-    currentPiece.x--
-    currentPiece.shape = rotated
-  }
+  const rotated = currentPiece.shape[0].map((_, i) => currentPiece.shape.map(row => row[i]).reverse())
+  if (!collides(currentPiece, 0, 0, rotated)) currentPiece.shape = rotated
+  else if (!collides(currentPiece, 1, 0, rotated)) { currentPiece.x++; currentPiece.shape = rotated }
+  else if (!collides(currentPiece, -1, 0, rotated)) { currentPiece.x--; currentPiece.shape = rotated }
 }
 
-const moveLeft = () => {
-  if (currentPiece && isPlaying.value && !collides(currentPiece, -1, 0)) {
-    currentPiece.x--
-  }
-}
-
-const moveRight = () => {
-  if (currentPiece && isPlaying.value && !collides(currentPiece, 1, 0)) {
-    currentPiece.x++
-  }
-}
-
-const drop = () => {
-  if (currentPiece && isPlaying.value && !collides(currentPiece, 0, 1)) {
-    currentPiece.y++
-  }
-}
-
+const moveLeft = () => { if (currentPiece && isPlaying.value && !collides(currentPiece, -1, 0)) currentPiece.x-- }
+const moveRight = () => { if (currentPiece && isPlaying.value && !collides(currentPiece, 1, 0)) currentPiece.x++ }
+const drop = () => { if (currentPiece && isPlaying.value && !collides(currentPiece, 0, 1)) currentPiece.y++ }
 const hardDrop = () => {
   if (!currentPiece || !isPlaying.value) return
-  while (!collides(currentPiece, 0, 1)) {
-    currentPiece.y++
-    score.value += 2
-  }
+  while (!collides(currentPiece, 0, 1)) { currentPiece.y++; score.value += 2 }
 }
 
 const moveDown = () => {
@@ -819,76 +495,67 @@ const moveDown = () => {
     if (collides(currentPiece, 0, 0)) {
       gameOver.value = true
       isPlaying.value = false
-      clearInterval(gameLoop)
+      cancelAnimationFrame(gameFrameId)
     }
   } else {
     currentPiece.y++
   }
 }
 
-const update = () => {
-  drawBoard()
-  updateParticles()
-  moveDown()
-}
-
-const animateScore = () => {
-  if (displayScore.value < score.value) {
-    displayScore.value += Math.ceil((score.value - displayScore.value) / 10)
-  }
+const gameLoop = (timestamp) => {
+  if (!isPlaying.value) return
+  drawBoard(timestamp)
+  gameFrameId = requestAnimationFrame(gameLoop)
 }
 
 const initBackground = () => {
   bgCtx = bgCanvas.value.getContext('2d')
-  
   const resize = () => {
     bgCanvas.value.width = window.innerWidth
     bgCanvas.value.height = window.innerHeight
+    stars = Array.from({ length: 80 }, () => ({
+      x: Math.random() * bgCanvas.value.width,
+      y: Math.random() * bgCanvas.value.height,
+      size: Math.random() * 1.5 + 0.5,
+      speed: Math.random() * 0.3 + 0.1,
+      opacity: Math.random()
+    }))
   }
   
   resize()
   window.addEventListener('resize', resize)
   
-  starsArray = []
-  for (let i = 0; i < 150; i++) {
-    starsArray.push(new Star(bgCanvas.value))
+  let lastBgUpdate = 0
+  const animateBg = (timestamp) => {
+    if (timestamp - lastBgUpdate >= 33) {
+      bgCtx.fillStyle = '#050510'
+      bgCtx.fillRect(0, 0, bgCanvas.value.width, bgCanvas.value.height)
+      
+      stars.forEach(star => {
+        star.opacity += (Math.random() - 0.5) * 0.1
+        star.opacity = Math.max(0.2, Math.min(1, star.opacity))
+        star.y += star.speed
+        if (star.y > bgCanvas.value.height) star.y = 0
+      
+        bgCtx.globalAlpha = star.opacity
+        bgCtx.fillStyle = '#fff'
+        bgCtx.beginPath()
+        bgCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2)
+        bgCtx.fill()
+      })
+      
+      bgCtx.globalAlpha = 1
+      lastBgUpdate = timestamp
+    }
+    
+    bgFrameId = requestAnimationFrame(animateBg)
   }
   
-  const animateBg = () => {
-    bgCtx.fillStyle = 'rgba(5, 5, 10, 1)'
-    bgCtx.fillRect(0, 0, bgCanvas.value.width, bgCanvas.value.height)
-    
-    const gradient = bgCtx.createRadialGradient(
-      bgCanvas.value.width * 0.3, bgCanvas.value.height * 0.3, 0,
-      bgCanvas.value.width * 0.3, bgCanvas.value.height * 0.3, bgCanvas.value.width * 0.6
-    )
-    gradient.addColorStop(0, 'rgba(30, 20, 60, 0.3)')
-    gradient.addColorStop(1, 'transparent')
-    bgCtx.fillStyle = gradient
-    bgCtx.fillRect(0, 0, bgCanvas.value.width, bgCanvas.value.height)
-    
-    const gradient2 = bgCtx.createRadialGradient(
-      bgCanvas.value.width * 0.7, bgCanvas.value.height * 0.7, 0,
-      bgCanvas.value.width * 0.7, bgCanvas.value.height * 0.7, bgCanvas.value.width * 0.5
-    )
-    gradient2.addColorStop(0, 'rgba(20, 40, 60, 0.2)')
-    gradient2.addColorStop(1, 'transparent')
-    bgCtx.fillStyle = gradient2
-    bgCtx.fillRect(0, 0, bgCanvas.value.width, bgCanvas.value.height)
-    
-    starsArray.forEach(star => {
-      star.update(bgCanvas.value)
-      star.draw(bgCtx)
-    })
-    
-    bgAnimationFrame = requestAnimationFrame(animateBg)
-  }
-  
-  animateBg()
+  animateBg(0)
 }
 
 const checkMobile = () => {
-  showMobileControls.value = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  showMobileControls.value = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 }
 
 const toggleLanguage = () => {
@@ -905,44 +572,27 @@ const startGame = () => {
   dropInterval = 1000
   gameOver.value = false
   isPlaying.value = true
-  particlesArray = []
+  particles = []
   combo.value = 0
-  lineClearEffects = []
   achievements.value = []
   
   currentPiece = createPiece()
   nextPiece = createPiece()
   drawNextPiece()
   
-  if (gameLoop) clearInterval(gameLoop)
-  gameLoop = setInterval(update, dropInterval)
-  setInterval(animateScore, 50)
+  lastDropTime = performance.now()
+  gameFrameId = requestAnimationFrame(gameLoop)
 }
 
 const handleKeydown = (e) => {
   if (!isPlaying.value && e.code !== 'Space') return
   
   switch(e.code) {
-    case 'ArrowLeft':
-      e.preventDefault()
-      moveLeft()
-      break
-    case 'ArrowRight':
-      e.preventDefault()
-      moveRight()
-      break
-    case 'ArrowDown':
-      e.preventDefault()
-      drop()
-      break
-    case 'ArrowUp':
-      e.preventDefault()
-      rotate()
-      break
-    case 'Space':
-      e.preventDefault()
-      hardDrop()
-      break
+    case 'ArrowLeft': e.preventDefault(); moveLeft(); break
+    case 'ArrowRight': e.preventDefault(); moveRight(); break
+    case 'ArrowDown': e.preventDefault(); drop(); break
+    case 'ArrowUp': e.preventDefault(); rotate(); break
+    case 'Space': e.preventDefault(); hardDrop(); break
   }
 }
 
@@ -951,12 +601,10 @@ onMounted(() => {
   nextCtx = nextCanvas.value.getContext('2d')
   
   const savedLang = localStorage.getItem('tetrisLang')
-  if (savedLang) {
-    currentLang.value = savedLang
-  }
+  if (savedLang) currentLang.value = savedLang
   
   initBoard()
-  drawBoard()
+  drawBoard(0)
   drawNextPiece()
   initBackground()
   checkMobile()
@@ -966,8 +614,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
-  if (gameLoop) clearInterval(gameLoop)
-  if (bgAnimationFrame) cancelAnimationFrame(bgAnimationFrame)
+  cancelAnimationFrame(gameFrameId)
+  cancelAnimationFrame(bgFrameId)
   if (comboTimer) clearTimeout(comboTimer)
 })
 </script>
@@ -977,6 +625,7 @@ onUnmounted(() => {
   min-height: 100vh;
   position: relative;
   overflow: hidden;
+  background: #050510;
 }
 
 .background-canvas {
@@ -1000,9 +649,8 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 30px;
   cursor: pointer;
-  transition: all 0.3s ease;
   z-index: 100;
-  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
 }
 
 .language-switcher:hover {
@@ -1010,15 +658,8 @@ onUnmounted(() => {
   transform: scale(1.05);
 }
 
-.lang-icon {
-  font-size: 1.2rem;
-}
-
-.lang-text {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 0.9rem;
-  font-weight: 500;
-}
+.lang-icon { font-size: 1.2rem; }
+.lang-text { color: rgba(255, 255, 255, 0.8); font-size: 0.9rem; }
 
 .game-container {
   position: relative;
@@ -1033,225 +674,116 @@ onUnmounted(() => {
 .title-section {
   text-align: center;
   margin-bottom: 30px;
-  position: relative;
 }
 
 .game-title {
-  font-size: 3.5rem;
+  font-size: 3rem;
   font-weight: 900;
   background: linear-gradient(135deg, #ff6b9d 0%, #c94bff 50%, #6b9dff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   margin: 0;
-  letter-spacing: 6px;
-  animation: titleGlow 3s ease-in-out infinite;
+  letter-spacing: 4px;
   display: flex;
   align-items: center;
   gap: 15px;
 }
 
-.title-icon {
-  font-size: 2.5rem;
-  animation: iconBounce 2s ease-in-out infinite;
-}
+.title-icon { font-size: 2rem; animation: bounce 2s ease-in-out infinite; }
+.title-icon:last-child { animation-delay: 1s; }
 
-.title-icon:last-child {
-  animation-delay: 1s;
-}
-
-@keyframes titleGlow {
-  0%, 100% { 
-    filter: drop-shadow(0 0 20px rgba(201, 75, 255, 0.5));
-  }
-  50% { 
-    filter: drop-shadow(0 0 40px rgba(107, 157, 255, 0.8));
-  }
-}
-
-@keyframes iconBounce {
+@keyframes bounce {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  50% { transform: translateY(-8px); }
 }
 
 .game-subtitle {
-  font-size: 1.2rem;
+  font-size: 1rem;
   color: rgba(255, 255, 255, 0.3);
-  letter-spacing: 20px;
-  margin-top: 10px;
-  font-weight: 300;
-}
-
-.title-glow {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 400px;
-  height: 150px;
-  background: radial-gradient(ellipse, rgba(201, 75, 255, 0.2), transparent 70%);
-  z-index: -1;
-  filter: blur(40px);
+  letter-spacing: 15px;
+  margin-top: 5px;
 }
 
 .glass-panel {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border-radius: 20px;
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
 }
 
 .glass-btn {
-  background: linear-gradient(135deg, rgba(201, 75, 255, 0.3), rgba(107, 157, 255, 0.3));
+  background: linear-gradient(135deg, rgba(201, 75, 255, 0.4), rgba(107, 157, 255, 0.4));
   border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
   border-radius: 30px;
-  padding: 15px 40px;
-  font-size: 1.2rem;
+  padding: 12px 30px;
+  font-size: 1rem;
   font-weight: 700;
   color: white;
   cursor: pointer;
   transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .glass-btn:hover {
   transform: scale(1.05);
-  box-shadow: 0 15px 40px rgba(201, 75, 255, 0.4);
+  box-shadow: 0 10px 30px rgba(201, 75, 255, 0.3);
 }
 
-.glass-btn .btn-icon {
-  font-size: 1.5rem;
-}
-
-.glass-btn .btn-particles {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  transform: translateX(-100%);
-  animation: btnShine 2s ease-in-out infinite;
-}
-
-@keyframes btnShine {
-  0%, 100% { transform: translateX(-100%); }
-  50% { transform: translateX(100%); }
-}
+.btn-icon { font-size: 1.2rem; }
 
 .game-area {
   display: flex;
-  gap: 30px;
+  gap: 25px;
   align-items: flex-start;
 }
 
 .left-panel {
-  padding: 25px;
-  min-width: 160px;
+  padding: 20px;
+  min-width: 150px;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 12px;
 }
 
 .stat-card {
-  position: relative;
-  padding: 20px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   align-items: center;
-  gap: 15px;
-  transition: all 0.3s ease;
+  gap: 12px;
+  padding: 15px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.stat-card:hover {
-  transform: translateX(5px);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.stat-icon {
-  font-size: 2rem;
-}
-
-.stat-content {
-  flex: 1;
-}
+.stat-icon { font-size: 1.8rem; }
 
 .stat-label {
   color: rgba(255, 255, 255, 0.5);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-bottom: 5px;
+  letter-spacing: 1px;
+  margin-bottom: 2px;
 }
 
-.stat-value {
-  font-size: 1.8rem;
-  font-weight: 800;
-}
-
-.stat-value.score {
-  background: linear-gradient(135deg, #ff6b9d, #ff9dbd);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.stat-value.level {
-  background: linear-gradient(135deg, #6b9dff, #9dbbff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.stat-value.lines {
-  background: linear-gradient(135deg, #9dff6b, #bbff9d);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.stat-value.highscore {
-  background: linear-gradient(135deg, #ffd700, #ffed4a);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.stat-glow {
-  position: absolute;
-  inset: -2px;
-  border-radius: 18px;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  filter: blur(10px);
-}
-
-.stat-card:hover .stat-glow {
-  opacity: 0.3;
-}
-
-.score-glow { background: linear-gradient(135deg, #ff6b9d, #ff9dbd); }
-.level-glow { background: linear-gradient(135deg, #6b9dff, #9dbbff); }
-.lines-glow { background: linear-gradient(135deg, #9dff6b, #bbff9d); }
-.highscore-glow { background: linear-gradient(135deg, #ffd700, #ffed4a); }
+.stat-value { font-size: 1.5rem; font-weight: 800; }
+.stat-value.score { background: linear-gradient(135deg, #ff6b9d, #ff9dbd); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.stat-value.level { background: linear-gradient(135deg, #6b9dff, #9dbbff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.stat-value.lines { background: linear-gradient(135deg, #9dff6b, #bbff9d); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.stat-value.highscore { background: linear-gradient(135deg, #ffd700, #ffed4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
 .combo-display {
   text-align: center;
-  padding: 15px;
+  padding: 12px;
   background: linear-gradient(135deg, rgba(255, 107, 157, 0.2), rgba(201, 75, 255, 0.2));
-  border-radius: 12px;
-  animation: comboPulse 0.5s ease-in-out infinite;
+  border-radius: 10px;
+  animation: pulse 0.5s ease-in-out infinite;
 }
 
 .combo-text {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   font-weight: 900;
   background: linear-gradient(135deg, #ff6b9d, #c94bff);
   -webkit-background-clip: text;
@@ -1259,136 +791,81 @@ onUnmounted(() => {
   background-clip: text;
 }
 
-@keyframes comboPulse {
+@keyframes pulse {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+  50% { transform: scale(1.03); }
 }
 
 .board-section {
   position: relative;
 }
 
-.board-3d-container {
-  perspective: 1000px;
-}
-
-.board-perspective {
-  transform: rotateX(5deg);
-  transform-style: preserve-3d;
-}
-
-.board-frame {
+.board-wrapper {
   position: relative;
-  padding: 6px;
-  background: linear-gradient(135deg, rgba(201, 75, 255, 0.3), rgba(107, 157, 255, 0.3));
-  border-radius: 16px;
-  box-shadow: 
-    0 20px 60px rgba(0, 0, 0, 0.5),
-    0 0 100px rgba(201, 75, 255, 0.2);
-}
-
-.board-inner {
-  position: relative;
+  padding: 4px;
+  background: linear-gradient(135deg, rgba(201, 75, 255, 0.4), rgba(107, 157, 255, 0.4));
   border-radius: 12px;
-  overflow: hidden;
+  box-shadow: 0 0 60px rgba(201, 75, 255, 0.2);
 }
 
-.board-scanline {
+.board-wrapper::before {
+  content: '';
   position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to bottom,
-    transparent 50%,
-    rgba(255, 255, 255, 0.02) 50%
-  );
-  background-size: 100% 4px;
-  pointer-events: none;
-  animation: scanline 8s linear infinite;
-}
-
-@keyframes scanline {
-  0% { background-position: 0 0; }
-  100% { background-position: 0 100%; }
-}
-
-.board-glow-effect {
-  position: absolute;
-  inset: -3px;
-  background: linear-gradient(45deg, #ff6b9d, #c94bff, #6b9dff, #ff6b9d);
-  border-radius: 18px;
+  inset: -2px;
+  background: linear-gradient(45deg, #ff6b9d, #c94bff, #6b9dff);
+  border-radius: 14px;
   z-index: -1;
-  filter: blur(20px);
-  opacity: 0.4;
-  animation: boardGlow 4s ease-in-out infinite;
+  opacity: 0.3;
+  filter: blur(15px);
+  animation: glow 4s ease-in-out infinite;
 }
 
-@keyframes boardGlow {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.5; }
+@keyframes glow {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.4; }
 }
 
 canvas {
   display: block;
-  border-radius: 10px;
+  border-radius: 8px;
+  background: #0a0a15;
 }
 
 .start-btn {
   position: absolute;
-  bottom: -70px;
+  bottom: -60px;
   left: 50%;
   transform: translateX(-50%);
 }
 
 .right-panel {
-  padding: 25px;
-  min-width: 180px;
+  padding: 20px;
+  min-width: 160px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
-
-.next-piece-container {
-  text-align: center;
+  gap: 15px;
 }
 
 .next-label {
   color: rgba(255, 255, 255, 0.6);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 3px;
-  margin-bottom: 15px;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+  text-align: center;
 }
 
-.next-canvas-wrapper {
-  position: relative;
-  display: inline-block;
-}
-
-.next-canvas-wrapper canvas {
-  border-radius: 12px;
+.next-piece-container canvas {
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.next-glow {
-  position: absolute;
-  inset: -5px;
-  background: linear-gradient(135deg, rgba(201, 75, 255, 0.3), rgba(107, 157, 255, 0.3));
-  border-radius: 16px;
-  z-index: -1;
-  filter: blur(15px);
-  opacity: 0.5;
-}
-
-.controls-section {
-  margin-top: 10px;
 }
 
 .controls-title {
   color: rgba(255, 255, 255, 0.4);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-bottom: 15px;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
   text-align: center;
 }
 
@@ -1396,66 +873,53 @@ canvas {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
+  padding: 8px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.control-item:last-child {
-  border-bottom: none;
-}
+.control-item:last-child { border-bottom: none; }
 
 .key-icon {
   background: rgba(255, 255, 255, 0.1);
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.action {
-  color: rgba(255, 255, 255, 0.5);
+  padding: 4px 10px;
+  border-radius: 6px;
   font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.8);
 }
 
-.achievements-section {
-  margin-top: 10px;
-}
+.action { color: rgba(255, 255, 255, 0.5); font-size: 0.8rem; }
 
 .achievements-title {
   color: rgba(255, 255, 255, 0.4);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-bottom: 10px;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
   text-align: center;
 }
 
 .achievement {
-  padding: 8px;
+  padding: 6px;
   background: rgba(255, 215, 0, 0.1);
   border: 1px solid rgba(255, 215, 0, 0.3);
-  border-radius: 8px;
-  font-size: 0.85rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
   color: rgba(255, 215, 0, 0.9);
   text-align: center;
-  margin-bottom: 5px;
-  animation: achievementPop 0.5s ease-out;
+  margin-bottom: 4px;
+  animation: pop 0.3s ease-out;
 }
 
-@keyframes achievementPop {
+@keyframes pop {
   0% { transform: scale(0.8); opacity: 0; }
-  50% { transform: scale(1.1); }
+  50% { transform: scale(1.05); }
   100% { transform: scale(1); opacity: 1; }
 }
 
 .game-over-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1463,33 +927,24 @@ canvas {
   animation: fadeIn 0.3s ease-out;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-.overlay-content {
-  text-align: center;
-}
+.overlay-content { text-align: center; }
 
 .game-over-text {
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: 900;
   color: #c41e3a;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
   text-shadow: 0 0 30px rgba(196, 30, 58, 0.8);
 }
 
-.final-score {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 1rem;
-  margin-bottom: 10px;
-}
+.final-score { color: rgba(255, 255, 255, 0.6); font-size: 0.9rem; margin-bottom: 8px; }
 
 .final-score-value {
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: 900;
-  background: linear-gradient(135deg, #ffd700 0%, #ffed4a 100%);
+  background: linear-gradient(135deg, #ffd700, #ffed4a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1501,62 +956,52 @@ canvas {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 100;
-  animation: comboOverlay 1s ease-out forwards;
+  animation: comboAnim 0.8s ease-out forwards;
 }
 
 .combo-effect {
-  font-size: 4rem;
+  font-size: 3rem;
   font-weight: 900;
   background: linear-gradient(135deg, #ff6b9d, #c94bff, #6b9dff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-shadow: 0 0 60px rgba(201, 75, 255, 0.8);
-  animation: comboText 1s ease-out forwards;
+  text-shadow: 0 0 40px rgba(201, 75, 255, 0.6);
 }
 
-@keyframes comboOverlay {
+@keyframes comboAnim {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
   80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
-}
-
-@keyframes comboText {
-  0% { opacity: 0; transform: scale(0.5); }
-  20% { opacity: 1; transform: scale(1.2); }
-  80% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1.5); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
 }
 
 .mobile-controls {
   display: none;
   justify-content: center;
-  gap: 15px;
-  margin-top: 40px;
+  gap: 12px;
+  margin-top: 30px;
 }
 
 .mobile-btn {
-  width: 80px;
-  height: 80px;
-  font-size: 2rem;
+  width: 70px;
+  height: 70px;
+  font-size: 1.8rem;
   background: rgba(255, 255, 255, 0.1);
   border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
+  border-radius: 16px;
   color: white;
   cursor: pointer;
   transition: all 0.2s ease;
-  backdrop-filter: blur(10px);
 }
 
 .mobile-btn:active {
   transform: scale(0.9);
   background: rgba(201, 75, 255, 0.3);
-  border-color: rgba(201, 75, 255, 0.5);
 }
 
 .mobile-btn.drop {
-  background: linear-gradient(135deg, rgba(201, 75, 255, 0.3), rgba(107, 157, 255, 0.3));
+  background: linear-gradient(135deg, rgba(201, 75, 255, 0.4), rgba(107, 157, 255, 0.4));
   border-color: rgba(201, 75, 255, 0.5);
 }
 
@@ -1573,60 +1018,21 @@ canvas {
     min-width: auto;
   }
   
-  .stat-card {
-    padding: 15px;
-  }
+  .mobile-controls { display: flex; }
   
-  .mobile-controls {
-    display: flex;
-  }
-  
-  .game-title {
-    font-size: 2.5rem;
-  }
-  
-  .title-icon {
-    font-size: 2rem;
-  }
-  
-  .game-subtitle {
-    font-size: 1rem;
-    letter-spacing: 15px;
-  }
+  .game-title { font-size: 2rem; }
+  .title-icon { font-size: 1.5rem; }
   
   .language-switcher {
-    top: 15px;
-    right: 15px;
+    top: 10px;
+    right: 10px;
     padding: 8px 12px;
   }
 }
 
 @media (max-width: 600px) {
-  .game-container {
-    padding: 15px;
-  }
-  
-  .game-title {
-    font-size: 2rem;
-    letter-spacing: 3px;
-  }
-  
-  .stat-card {
-    padding: 12px;
-  }
-  
-  .stat-value {
-    font-size: 1.5rem;
-  }
-  
-  .stat-icon {
-    font-size: 1.5rem;
-  }
-  
-  .mobile-btn {
-    width: 70px;
-    height: 70px;
-    font-size: 1.8rem;
-  }
+  .game-title { font-size: 1.5rem; }
+  .stat-value { font-size: 1.2rem; }
+  .mobile-btn { width: 60px; height: 60px; font-size: 1.5rem; }
 }
 </style>
