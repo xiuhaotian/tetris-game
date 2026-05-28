@@ -825,11 +825,11 @@ kbd {
   .m-btn { width: 52px; height: 52px; font-size: 1.2rem; }
   .go-title { font-size: 1.6rem; }
   .go-num { font-size: 1.6rem; }
-  .board-section { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; }
-  .board-frame { width: auto; height: 100%; aspect-ratio: 328 / 648; }
-  .board-frame canvas { width: 100%; height: 100%; }
+  .board-section { flex: 1; min-height: 0; display: flex; justify-content: center; }
+  .board-frame { height: 100%; width: auto; aspect-ratio: 328 / 648; }
+  .board-frame canvas { width: 100%; height: 100%; display: block; }
   .right-panel { align-items: center; gap: 4px; }
-  .char-box canvas { width: 85px; height: auto; }
+  .char-box :deep(.char-svg) { width: 100px; height: auto; }
 }
 
 @media (max-width: 900px) {

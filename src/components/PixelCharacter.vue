@@ -484,18 +484,18 @@ const armR = computed(() => {
         <!-- Main hair volume (top) -->
         <ellipse cx="0" cy="-41" rx="19" ry="16" fill="url(#hairGrad)" />
 
-        <!-- Bangs — side-swept strands -->
-        <path d="M-10,-48 Q-18,-36 -13,-22 Q-11,-28 -7,-38 Z" fill="#1A1A2E" />
-        <path d="M-3,-50 Q-10,-38 -6,-24 Q-4,-30 -2,-40 Z" fill="#1A1A2E" />
-        <path d="M0,-52 Q-4,-40 0,-28 Q2,-34 2,-44 Z" fill="#1A1A2E" />
-        <path d="M6,-50 Q10,-38 8,-26 Q6,-32 4,-42 Z" fill="#1A1A2E" />
-        <path d="M12,-46 Q17,-34 14,-24 Q12,-30 10,-38 Z" fill="#1A1A2E" />
+        <!-- Bangs — short swept strands, clearly above eyes -->
+        <path d="M-10,-48 Q-18,-40 -12,-36 Q-10,-42 -6,-46 Z" fill="#1A1A2E" />
+        <path d="M-3,-50 Q-10,-42 -5,-36 Q-3,-42 0,-46 Z" fill="#1A1A2E" />
+        <path d="M0,-52 Q-4,-44 0,-36 Q2,-42 2,-46 Z" fill="#1A1A2E" />
+        <path d="M6,-50 Q10,-42 6,-36 Q4,-42 3,-46 Z" fill="#1A1A2E" />
+        <path d="M12,-46 Q16,-40 12,-36 Q10,-40 8,-44 Z" fill="#1A1A2E" />
 
-        <!-- Side hair overlapping face -->
-        <rect x="-20" y="-35" width="7" height="22" rx="3" fill="#1A1A2E" />
-        <rect x="13" y="-35" width="7" height="22" rx="3" fill="#1A1A2E" />
-        <ellipse cx="-17" cy="-16" rx="5" ry="8" fill="#1A1A2E" />
-        <ellipse cx="17" cy="-16" rx="5" ry="8" fill="#1A1A2E" />
+        <!-- Side hair — moved outward to not cover eyes -->
+        <rect x="-22" y="-35" width="5" height="22" rx="2" fill="#1A1A2E" />
+        <rect x="17" y="-35" width="5" height="22" rx="2" fill="#1A1A2E" />
+        <ellipse cx="-19" cy="-16" rx="4" ry="8" fill="#1A1A2E" />
+        <ellipse cx="19" cy="-16" rx="4" ry="8" fill="#1A1A2E" />
 
         <!-- Hair highlights -->
         <path d="M-4,-46 Q-8,-40 -4,-33 L-3,-37 Q-5,-42 -3,-46 Z" fill="#3A3A5A" />
@@ -534,7 +534,9 @@ const armR = computed(() => {
 .char-svg {
   display: block;
   width: 112px;
-  height: 160px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 112 / 160;
   will-change: transform;
 }
 </style>
