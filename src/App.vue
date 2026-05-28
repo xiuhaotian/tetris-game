@@ -802,6 +802,8 @@ onUnmounted(() => {
   align-items: center;
   padding: 20px;
   min-height: 100vh;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }
 
 .title-section {
@@ -1279,15 +1281,27 @@ canvas {
     min-width: auto;
   }
   
-  .mobile-controls { display: flex; }
+  .mobile-controls { 
+    display: flex; 
+    padding-bottom: env(safe-area-inset-bottom);
+  }
   
   .game-title { font-size: 2rem; }
   .title-icon { font-size: 1.5rem; }
   
   .language-switcher {
-    top: 10px;
+    top: max(10px, env(safe-area-inset-top));
     right: 10px;
     padding: 8px 12px;
+  }
+  
+  .title-section {
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+  
+  .board-wrapper {
+    max-width: 100vw;
+    margin: 0 10px;
   }
 }
 
