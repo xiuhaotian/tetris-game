@@ -75,9 +75,21 @@
           </div>
 
           <div class="char-box">
-            <div class="panel-label">{{ stageNames[currentLang][characterStage] || 'JK制服' }}</div>
+            <div class="panel-label">{{ stageNames[currentLang][characterStage] }}</div>
             <div class="char-canvas-wrap">
-              <PixelCharacter :stage="characterStage" :action="characterAction" />
+              <PixelCharacter :stage="characterStage" :action="characterAction" :character="selectedCharacter" />
+            </div>
+            <div class="char-selector">
+              <button v-for="ch in characterList" :key="ch.id"
+                :class="['char-btn', { active: selectedCharacter === ch.id }]"
+                @click="selectedCharacter = ch.id">
+                {{ ch.label }}
+              </button>
+            </div>
+            <div class="ai-toggle">
+              <button :class="['ai-btn', { active: isAiPlaying }]" @click="toggleAi">
+                🤖 {{ isAiPlaying ? 'ON' : 'OFF' }}
+              </button>
             </div>
           </div>
 
@@ -144,10 +156,25 @@ const currentLang = ref('zh')
 const showComboEffect = ref(false)
 const comboEffectText = ref('')
 
-const stageNames = {
-  zh: ['JK制服', '衬衫+裙子', '便服', '内衣', '裸体', '全裸'],
-  en: ['JK Uniform', 'Blouse & Skirt', 'Casual Dress', 'Underwear', 'Nude', 'Fully Nude'],
-}
+const selectedCharacter = ref('sayaka')
+const isAiPlaying = ref(false)
+const characterList = [
+  { id: 'sayaka', label: 'Sayaka' },
+  { id: 'tomoko', label: 'Tomoko' },
+]
+
+const stageNames = computed(() => {
+  if (selectedCharacter.value === 'tomoko') {
+    return {
+      zh: ['水手服', '便服A', '便服B', '内衣', '裸体', '全裸'],
+      en: ['School Uniform', 'Casual Wear', 'Casual Outfit', 'Underwear', 'Nude', 'Fully Nude'],
+    }
+  }
+  return {
+    zh: ['JK制服', '衬衫+裙子', '便服', '内衣', '裸体', '全裸'],
+    en: ['JK Uniform', 'Blouse & Skirt', 'Casual Dress', 'Underwear', 'Nude', 'Fully Nude'],
+  }
+})
 const stageThresholds = [0, 500, 1500, 3000, 5000, 8000]
 const characterStage = computed(() => {
   for (let i = stageThresholds.length - 1; i >= 0; i--)
@@ -443,6 +470,7 @@ const moveDown = () => {
 const gameLoop = (timestamp) => {
   if (!isPlaying.value) return
   drawBoard(timestamp)
+  if (isAiPlaying.value && currentPiece) executeAiMove()
   gameFrameId = requestAnimationFrame(gameLoop)
 }
 
@@ -498,6 +526,91 @@ const updateStage = () => {
   }
 }
 
+function evaluateBoard(board, linesCleared) {
+  const heights = []
+  let holes = 0
+  for (let x = 0; x < BOARD_WIDTH; x++) {
+    let h = 0
+    let blockFound = false
+    let holeCount = 0
+    for (let y = 0; y < BOARD_HEIGHT; y++) {
+      if (board[y][x] !== 0) { blockFound = true; h = BOARD_HEIGHT - y }
+      else if (blockFound) holeCount++
+    }
+    heights.push(h)
+    holes += holeCount
+  }
+  const aggH = heights.reduce((a, b) => a + b, 0)
+  let bump = 0
+  for (let i = 1; i < heights.length; i++) bump += Math.abs(heights[i] - heights[i - 1])
+  return -0.510066 * aggH + 0.760666 * linesCleared - 0.35663 * holes - 0.184483 * bump
+}
+
+function simulatePlacement(board, piece, rotation, x) {
+  const b = board.map(row => [...row])
+  let shape = piece.shape
+  for (let r = 0; r < rotation; r++)
+    shape = shape[0].map((_, i) => shape.map(row => row[i]).reverse())
+  if (x < 0 || x + shape[0].length > BOARD_WIDTH) return null
+  let y = 0
+  while (true) {
+    let hit = false
+    for (let sy = 0; sy < shape.length && !hit; sy++)
+      for (let sx = 0; sx < shape[sy].length && !hit; sx++)
+        if (shape[sy][sx]) {
+          const nx = x + sx, ny = y + sy + 1
+          if (ny >= BOARD_HEIGHT || (ny >= 0 && b[ny][nx])) hit = true
+        }
+    if (hit) break
+    y++
+  }
+  for (let sy = 0; sy < shape.length; sy++)
+    for (let sx = 0; sx < shape[sy].length; sx++)
+      if (shape[sy][sx]) {
+        const ny = y + sy, nx = x + sx
+        if (ny >= 0 && ny < BOARD_HEIGHT && nx >= 0 && nx < BOARD_WIDTH) b[ny][nx] = '#fff'
+      }
+  let cleared = 0
+  for (let cy = BOARD_HEIGHT - 1; cy >= 0; cy--) {
+    if (b[cy].every(c => c !== 0)) {
+      b.splice(cy, 1); b.unshift(Array(BOARD_WIDTH).fill(0)); cleared++; cy++
+    }
+  }
+  return evaluateBoard(b, cleared)
+}
+
+function findBestMove() {
+  if (!currentPiece) return null
+  let bestScore = -Infinity, bestMove = { rotation: 0, x: 0 }
+  for (let rotation = 0; rotation < 4; rotation++) {
+    let shape = currentPiece.shape
+    for (let r = 0; r < rotation; r++)
+      shape = shape[0].map((_, i) => shape.map(row => row[i]).reverse())
+    const maxX = BOARD_WIDTH - shape[0].length
+    for (let x = 0; x <= maxX; x++) {
+      const score = simulatePlacement(board, currentPiece, rotation, x)
+      if (score > bestScore) { bestScore = score; bestMove = { rotation, x } }
+    }
+  }
+  return bestMove
+}
+
+function executeAiMove() {
+  if (!isAiPlaying.value || !isPlaying.value || !currentPiece) return false
+  const move = findBestMove()
+  if (!move) return false
+  for (let r = 0; r < move.rotation; r++) rotate()
+  while (currentPiece && currentPiece.x !== move.x) {
+    if (currentPiece.x < move.x) moveRight(); else moveLeft()
+  }
+  if (currentPiece) { drop(); moveDown(); lastDropTime = performance.now() }
+  return true
+}
+
+const toggleAi = () => {
+  isAiPlaying.value = !isAiPlaying.value
+}
+
 const startGame = () => {
   initBoard(); score.value = 0; displayScore.value = 0; level.value = 1
   lines.value = 0; dropInterval = 1000; gameOver.value = false; isPlaying.value = true
@@ -508,6 +621,7 @@ const startGame = () => {
 }
 
 const handleKeydown = (e) => {
+  if (isAiPlaying.value) return
   if (!isPlaying.value && e.code !== 'Space') return
   switch(e.code) {
     case 'ArrowLeft': e.preventDefault(); moveLeft(); break
@@ -523,11 +637,12 @@ const handleKeydown = (e) => {
 }
 
 const handleTouchStart = (e) => {
+  if (isAiPlaying.value) return
   touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; touchStartTime = Date.now()
 }
 
 const handleTouchEnd = (e) => {
-  if (!isPlaying.value) return
+  if (isAiPlaying.value || !isPlaying.value) return
   const endX = e.changedTouches[0].clientX, endY = e.changedTouches[0].clientY
   const dur = Date.now() - touchStartTime, dx = endX - touchStartX, dy = endY - touchStartY
   if (dur < 200 && Math.abs(dx) < 10 && Math.abs(dy) < 10) { rotate(); return }
@@ -724,6 +839,31 @@ onUnmounted(() => {
 
 .char-box { text-align: center; }
 .char-canvas-wrap { display: flex; justify-content: center; }
+.char-selector { display: flex; justify-content: center; gap: 4px; margin-top: 4px; }
+.char-btn {
+  padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.4);
+  font-size: 0.6rem; cursor: pointer; transition: 0.2s; font-weight: 600;
+  font-family: inherit;
+}
+.char-btn:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); }
+.char-btn.active {
+  background: linear-gradient(135deg, rgba(201,75,255,0.25), rgba(107,157,255,0.25));
+  border-color: rgba(201,75,255,0.4); color: white;
+}
+.ai-toggle { margin-top: 4px; }
+.ai-btn {
+  padding: 4px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.4);
+  font-size: 0.65rem; cursor: pointer; transition: 0.2s; font-weight: 700;
+  width: 100%; font-family: inherit;
+}
+.ai-btn:hover { background: rgba(255,255,255,0.08); }
+.ai-btn.active {
+  background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,200,100,0.2));
+  border-color: rgba(0,255,136,0.35); color: #00ff88;
+  box-shadow: 0 0 16px rgba(0,255,136,0.12);
+}
 
 .ctrl-box {}
 .ctrl-grid { display: flex; flex-direction: column; gap: 3px; }
@@ -830,6 +970,8 @@ kbd {
   .board-frame canvas { width: 100%; height: 100%; display: block; }
   .right-panel { align-items: center; gap: 4px; }
   .char-box :deep(.char-canvas) { width: 120px; height: auto; }
+  .char-btn { font-size: 0.55rem; padding: 2px 8px; }
+  .ai-btn { font-size: 0.55rem; padding: 3px 10px; }
 }
 
 @media (max-width: 900px) {

@@ -1,34 +1,59 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 
 const props = defineProps({
   stage: { type: Number, default: 0 },
   action: { type: String, default: 'idle' },
+  character: { type: String, default: 'sayaka' },
 })
 
 const cvs = ref(null)
 const bobY = ref(0)
 const tilt = ref(0)
 
-const IMG = '/sprites/sayaka/Idle'
+const characters = {
+  sayaka: {
+    name: 'Sayaka',
+    path: '/sprites/sayaka/Idle',
+    prefix: 'Saya_I',
+    stages: [
+      { body: 'Nude1', face: 'Happy',  clothes: ['SchoolUni1', 'Stocking1', 'SchoolShoes'] },
+      { body: 'Nude1', face: 'Happy',  clothes: ['SchoolUni2', 'Stocking2', 'SchoolShoes'] },
+      { body: 'Nude1', face: 'Happy',  clothes: ['CasualDress', 'CasualShoes'] },
+      { body: 'Nude1', face: 'Angry',  clothes: ['Bra', 'Panties'] },
+      { body: 'Nude1', face: 'Sad',    clothes: [] },
+      { body: 'Nude2', face: 'Sad',    clothes: [] },
+    ],
+  },
+  tomoko: {
+    name: 'Tomoko',
+    path: '/sprites/tomoko/Idle',
+    prefix: 'Tomo_I',
+    stages: [
+      { body: 'Nude1', face: 'Happy', clothes: ['SchoolUniform', 'SchoolShoes', 'Stocking'] },
+      { body: 'Nude1', face: 'Happy', clothes: ['CasualOutfit1', 'Boots'] },
+      { body: 'Nude1', face: 'Happy', clothes: ['CasualOutfit2', 'Boots'] },
+      { body: 'Nude1', face: 'Angry', clothes: ['Bra', 'Pantie'] },
+      { body: 'Nude1', face: 'Sad',   clothes: [] },
+      { body: 'Nude2', face: 'Sad',   clothes: [] },
+    ],
+  },
+}
+
 const CW = 216
 const CH = 384
 
-const PP = 'Saya_I'
-const stageCfg = [
-  { body: `${PP}Nude1`, face: `${PP}Happy`,  clothes: [`${PP}SchoolUni1`, `${PP}Stocking1`, `${PP}SchoolShoes`] },
-  { body: `${PP}Nude1`, face: `${PP}Happy`,  clothes: [`${PP}SchoolUni2`, `${PP}Stocking2`, `${PP}SchoolShoes`] },
-  { body: `${PP}Nude1`, face: `${PP}Happy`,  clothes: [`${PP}CasualDress`, `${PP}CasualShoes`] },
-  { body: `${PP}Nude1`, face: `${PP}Angry`,  clothes: [`${PP}Bra`, `${PP}Panties`] },
-  { body: `${PP}Nude1`, face: `${PP}Sad`,    clothes: [] },
-  { body: `${PP}Nude2`, face: `${PP}Sad`,    clothes: [] },
-]
+const charData = computed(() => characters[props.character] || characters.sayaka)
 
-const neededFiles = new Set()
-for (const cfg of stageCfg) {
-  neededFiles.add(`Body/${cfg.body}.png`)
-  neededFiles.add(`Faces/${cfg.face}.png`)
-  for (const c of cfg.clothes) neededFiles.add(`Clothes/${c}.png`)
+function getNeededFiles(cfg) {
+  const files = new Set()
+  const p = cfg.prefix
+  for (const s of cfg.stages) {
+    files.add(`Body/${p}${s.body}.png`)
+    files.add(`Faces/${p}${s.face}.png`)
+    for (const c of s.clothes) files.add(`Clothes/${p}${c}.png`)
+  }
+  return files
 }
 
 let imageCache = {}
@@ -36,23 +61,39 @@ let allLoaded = false
 let frameId = null
 let startTime = 0
 
+function loadImages() {
+  allLoaded = false
+  imageCache = {}
+  const data = charData.value
+  const files = getNeededFiles(data)
+  let pending = files.size
+  for (const f of files) {
+    const img = new Image()
+    img.onload = () => {
+      pending--
+      if (!pending) { allLoaded = true; draw() }
+    }
+    img.src = `${data.path}/${f}`
+    imageCache[f] = img
+  }
+  if (files.size === 0) allLoaded = true
+}
+
 function draw() {
   const canvas = cvs.value
   if (!canvas || !allLoaded) return
   const ctx = canvas.getContext('2d')
-  const cfg = stageCfg[props.stage] || stageCfg[0]
-
+  const data = charData.value
+  const cfg = data.stages[props.stage] || data.stages[0]
+  const p = data.prefix
   ctx.clearRect(0, 0, CW, CH)
-
-  const body = imageCache[`Body/${cfg.body}.png`]
+  const body = imageCache[`Body/${p}${cfg.body}.png`]
   if (body) ctx.drawImage(body, 0, 0, CW, CH)
-
   for (const item of cfg.clothes) {
-    const img = imageCache[`Clothes/${item}.png`]
+    const img = imageCache[`Clothes/${p}${item}.png`]
     if (img) ctx.drawImage(img, 0, 0, CW, CH)
   }
-
-  const face = imageCache[`Faces/${cfg.face}.png`]
+  const face = imageCache[`Faces/${p}${cfg.face}.png`]
   if (face) ctx.drawImage(face, 0, 0, CW, CH)
 }
 
@@ -72,18 +113,10 @@ function loop(t) {
 }
 
 watch(() => props.stage, () => { draw() })
+watch(() => props.character, () => { loadImages() })
 
 onMounted(() => {
-  let pending = neededFiles.size
-  for (const f of neededFiles) {
-    const img = new Image()
-    img.onload = () => {
-      pending--
-      if (!pending) { allLoaded = true; draw() }
-    }
-    img.src = `${IMG}/${f}`
-    imageCache[f] = img
-  }
+  loadImages()
   frameId = requestAnimationFrame(loop)
 })
 
@@ -94,7 +127,7 @@ onUnmounted(() => {
 
 <template>
   <div class="char-wrap" :style="{ transform: `translateY(${bobY}px) rotate(${tilt}deg)` }">
-    <canvas ref="cvs" width="216" height="384" class="char-canvas"></canvas>
+    <canvas ref="cvs" :width="CW" :height="CH" class="char-canvas"></canvas>
   </div>
 </template>
 
