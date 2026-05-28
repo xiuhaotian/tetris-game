@@ -20,31 +20,10 @@ const W = CW * P
 const H = CH * P
 
 const C = {
-  hair: '#7A4A2E',
-  hairLight: '#B8865C',
-  hairDark: '#4A2815',
-  skin: '#FDE8D0',
-  skinShadow: '#E8C9A8',
-  eyeWhite: '#FFFFFF',
-  iris: '#6B3A5E',
-  pupil: '#1A0A1A',
   mouth: '#D44050',
   blush: '#FFB0B0',
-  neck: '#F0D5B8',
-  top: '#4A90D9',
-  topLight: '#80B8F0',
-  topDark: '#2A5A80',
-  skirt: '#3A3A6A',
-  skirtLight: '#5A5A9A',
-  sock: '#FFFFFF',
   sockBand: '#FFB0D0',
-  shoe: '#3A2A2A',
   shoeDark: '#1A1010',
-  arm: '#F0D5B8',
-  leg: '#FDE8D0',
-  legShadow: '#E0C0A0',
-  white: '#FFFFFF',
-  black: '#1A1A1A',
 }
 
 const OUTFITS = {
