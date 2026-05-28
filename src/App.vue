@@ -805,8 +805,8 @@ kbd {
 
 /* ── Responsive ── */
 @media (max-width: 780px) {
-  .game-container { max-width: 100%; padding: 6px 10px; }
-  .main-area { gap: 8px; }
+  .game-container { max-width: 100%; padding: 6px 10px; overflow-x: hidden; }
+  .main-area { flex-direction: column; align-items: center; gap: 8px; }
   .left-panel { width: auto; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 3px; }
   .left-panel .stat { padding: 5px 8px; gap: 5px; }
   .left-panel .stat-icon { font-size: 0.85rem; }
