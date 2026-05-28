@@ -38,6 +38,19 @@ const characters = {
       { body: 'Nude2', face: 'Sad',   clothes: [] },
     ],
   },
+  himiko: {
+    name: 'Himiko',
+    path: '/sprites/himiko/Idle',
+    prefix: 'Himi_I',
+    stages: [
+      { body: 'Nude1', face: 'Happy',   clothes: ['SchoolUni', 'SchoolShoes', 'Socks'] },
+      { body: 'Nude1', face: 'Happy',   clothes: ['CasualFit1', 'Boots'] },
+      { body: 'Nude1', face: 'Smile',   clothes: ['CasualFit2', 'Boots'] },
+      { body: 'Nude1', face: 'Angry',   clothes: ['Bra', 'Panties'] },
+      { body: 'Nude1', face: 'Sad',     clothes: [] },
+      { body: 'Nude2', face: 'Sad',     clothes: [] },
+    ],
+  },
 }
 
 const CW = 216
