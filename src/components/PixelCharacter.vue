@@ -14,8 +14,6 @@ const IMG = '/sprites/sayaka/Idle'
 const CW = 216
 const CH = 384
 
-const blinkRect = { x: 82, y: 46, w: 35, h: 4 }
-
 const PP = 'Saya_I'
 const stageCfg = [
   { body: `${PP}Nude1`, face: `${PP}Happy`,  clothes: [`${PP}SchoolUni1`, `${PP}Stocking1`, `${PP}SchoolShoes`] },
@@ -36,8 +34,6 @@ for (const cfg of stageCfg) {
 let imageCache = {}
 let allLoaded = false
 let frameId = null
-let blinkState = 0
-let blinkInterval = null
 let startTime = 0
 
 function draw() {
@@ -58,11 +54,6 @@ function draw() {
 
   const face = imageCache[`Faces/${cfg.face}.png`]
   if (face) ctx.drawImage(face, 0, 0, CW, CH)
-
-  if (blinkState) {
-    ctx.fillStyle = '#F2BC84'
-    ctx.fillRect(blinkRect.x, blinkRect.y, blinkRect.w, blinkRect.h)
-  }
 }
 
 function loop(t) {
@@ -93,16 +84,11 @@ onMounted(() => {
     img.src = `${IMG}/${f}`
     imageCache[f] = img
   }
-  blinkInterval = setInterval(() => {
-    blinkState = 1
-    setTimeout(() => { blinkState = 0 }, 110)
-  }, 1800 + Math.random() * 1800)
   frameId = requestAnimationFrame(loop)
 })
 
 onUnmounted(() => {
   if (frameId) cancelAnimationFrame(frameId)
-  if (blinkInterval) clearInterval(blinkInterval)
 })
 </script>
 
