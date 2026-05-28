@@ -145,8 +145,8 @@ const showComboEffect = ref(false)
 const comboEffectText = ref('')
 
 const stageNames = {
-  zh: ['JK制服', '脱了外套', '衬衫敞开', '吊带背心', '蕾丝内衣', '浴巾'],
-  en: ['JK Uniform', 'No Blazer', 'Shirt Open', 'Camisole', 'Lace Lingerie', 'Towel'],
+  zh: ['JK制服', '衬衫+裙子', '便服', '内衣', '裸体', '全裸'],
+  en: ['JK Uniform', 'Blouse & Skirt', 'Casual Dress', 'Underwear', 'Nude', 'Fully Nude'],
 }
 const stageThresholds = [0, 500, 1500, 3000, 5000, 8000]
 const characterStage = computed(() => {
@@ -829,7 +829,7 @@ kbd {
   .board-frame { height: 100%; width: auto; aspect-ratio: 328 / 648; }
   .board-frame canvas { width: 100%; height: 100%; display: block; }
   .right-panel { align-items: center; gap: 4px; }
-  .char-box :deep(.char-svg) { width: 120px; height: auto; }
+  .char-box :deep(.char-canvas) { width: 120px; height: auto; }
 }
 
 @media (max-width: 900px) {
