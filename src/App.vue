@@ -88,6 +88,32 @@
             </div>
           </div>
           
+          <div class="character-container">
+            <div class="character-label">{{ currentOutfit.name }}</div>
+            <div class="character-display">
+              <div class="pixel-character" :class="[currentOutfit.id, characterAction]">
+                <div class="character-body">
+                  <div class="head">
+                    <div class="hair"></div>
+                    <div class="face">
+                      <div class="eyes">
+                        <div class="eye left" :class="{ blink: isBlinking }"></div>
+                        <div class="eye right" :class="{ blink: isBlinking }"></div>
+                      </div>
+                      <div class="mouth" :class="mouthExpression"></div>
+                      <div class="blush left"></div>
+                      <div class="blush right"></div>
+                    </div>
+                  </div>
+                  <div class="body-clothes"></div>
+                  <div class="legs"></div>
+                  <div class="accessories"></div>
+                </div>
+                <div class="character-shadow"></div>
+              </div>
+            </div>
+          </div>
+          
           <div class="controls-section">
             <div class="controls-title">{{ t('controls') }}</div>
             <div class="control-item">
@@ -163,6 +189,19 @@ const currentLang = ref('zh')
 const showComboEffect = ref(false)
 const comboEffectText = ref('')
 
+const outfits = [
+  { id: 'casual', name: '休闲装', score: 0 },
+  { id: 'school', name: '学生装', score: 500 },
+  { id: 'party', name: '派对装', score: 1500 },
+  { id: 'princess', name: '公主装', score: 3000 },
+  { id: 'angel', name: '天使装', score: 5000 }
+]
+
+const currentOutfit = ref(outfits[0])
+const characterAction = ref('idle')
+const isBlinking = ref(false)
+const mouthExpression = ref('smile')
+
 let ctx = null, nextCtx = null, bgCtx = null
 let gameFrameId = null, bgFrameId = null
 let currentPiece = null, nextPiece = null
@@ -173,6 +212,9 @@ let particles = []
 let stars = []
 let touchStartX = 0, touchStartY = 0, touchStartTime = 0
 let comboTimer = null
+let blinkTimer = null
+let actionTimer = null
+let expressionTimer = null
 
 const BOARD_WIDTH = 10
 const BOARD_HEIGHT = 20
@@ -508,6 +550,8 @@ const clearLines = () => {
       comboEffectText.value = `${combo.value}x COMBO! +${Math.floor(points)}`
       setTimeout(() => showComboEffect.value = false, 800)
     }
+    
+    updateOutfit()
   }
 }
 
@@ -631,6 +675,48 @@ const toggleLanguage = () => {
   localStorage.setItem('tetrisLang', currentLang.value)
 }
 
+const updateOutfit = () => {
+  for (let i = outfits.length - 1; i >= 0; i--) {
+    if (score.value >= outfits[i].score) {
+      if (currentOutfit.value.id !== outfits[i].id) {
+        currentOutfit.value = outfits[i]
+        characterAction.value = 'cheer'
+        setTimeout(() => { characterAction.value = 'idle' }, 1500)
+      }
+      break
+    }
+  }
+}
+
+const startBlinking = () => {
+  blinkTimer = setInterval(() => {
+    isBlinking.value = true
+    setTimeout(() => { isBlinking.value = false }, 200)
+  }, 3000 + Math.random() * 2000)
+}
+
+const startCharacterActions = () => {
+  const actions = ['idle', 'wave', 'jump', 'dance']
+  actionTimer = setInterval(() => {
+    if (isPlaying.value && Math.random() > 0.7) {
+      const action = actions[Math.floor(Math.random() * (actions.length - 1)) + 1]
+      characterAction.value = action
+      setTimeout(() => { characterAction.value = 'idle' }, 1000)
+    }
+  }, 5000)
+}
+
+const startExpressionChange = () => {
+  const expressions = ['smile', 'happy', 'excited']
+  expressionTimer = setInterval(() => {
+    if (isPlaying.value) {
+      mouthExpression.value = expressions[Math.floor(Math.random() * expressions.length)]
+    } else {
+      mouthExpression.value = 'smile'
+    }
+  }, 4000)
+}
+
 const startGame = () => {
   initBoard()
   score.value = 0
@@ -643,6 +729,10 @@ const startGame = () => {
   particles = []
   combo.value = 0
   achievements.value = []
+  
+  currentOutfit.value = outfits[0]
+  characterAction.value = 'idle'
+  mouthExpression.value = 'smile'
   
   currentPiece = createPiece()
   nextPiece = createPiece()
@@ -720,6 +810,9 @@ onMounted(() => {
   drawNextPiece()
   initBackground()
   checkMobile()
+  startBlinking()
+  startCharacterActions()
+  startExpressionChange()
   
   window.addEventListener('keydown', handleKeydown)
   document.addEventListener('touchmove', preventScroll, { passive: false })
@@ -739,6 +832,9 @@ onUnmounted(() => {
   cancelAnimationFrame(gameFrameId)
   cancelAnimationFrame(bgFrameId)
   if (comboTimer) clearTimeout(comboTimer)
+  if (blinkTimer) clearInterval(blinkTimer)
+  if (actionTimer) clearInterval(actionTimer)
+  if (expressionTimer) clearInterval(expressionTimer)
   
   const gameArea = document.querySelector('.game-area')
   if (gameArea) {
@@ -1113,6 +1209,351 @@ canvas {
   z-index: -1;
   filter: blur(10px);
   opacity: 0.5;
+}
+
+.character-container {
+  text-align: center;
+}
+
+.character-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.character-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100px;
+}
+
+.pixel-character {
+  position: relative;
+  width: 64px;
+  height: 80px;
+  transition: transform 0.3s ease;
+}
+
+.pixel-character.idle {
+  animation: idleBounce 2s ease-in-out infinite;
+}
+
+.pixel-character.wave {
+  animation: wave 1s ease-in-out;
+}
+
+.pixel-character.jump {
+  animation: jump 0.5s ease-out;
+}
+
+.pixel-character.dance {
+  animation: dance 0.5s ease-in-out infinite;
+}
+
+.pixel-character.cheer {
+  animation: cheer 0.5s ease-out infinite;
+}
+
+@keyframes idleBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(20deg); }
+  50% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
+}
+
+@keyframes jump {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+
+@keyframes dance {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(-3px) rotate(-5deg); }
+  75% { transform: translateX(3px) rotate(5deg); }
+}
+
+@keyframes cheer {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-8px) scale(1.05); }
+}
+
+.character-body {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.head {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 28px;
+}
+
+.hair {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 32px;
+  height: 20px;
+  background: linear-gradient(180deg, #8B4513 0%, #5D2E0C 100%);
+  border-radius: 8px 8px 2px 2px;
+}
+
+.casual .hair { background: linear-gradient(180deg, #8B4513 0%, #5D2E0C 100%); }
+.school .hair { background: linear-gradient(180deg, #4A4A4A 0%, #2D2D2D 100%); }
+.party .hair { background: linear-gradient(180deg, #FF6B9D 0%, #C94BFF 100%); }
+.princess .hair { background: linear-gradient(180deg, #FFD700 0%, #B89900 100%); }
+.angel .hair { background: linear-gradient(180deg, #FFFFFF 0%, #E0E0E0 100%); }
+
+.face {
+  position: absolute;
+  bottom: 0;
+  left: 2px;
+  width: 28px;
+  height: 14px;
+  background: linear-gradient(180deg, #FFE4C4 0%, #F5DEB3 100%);
+  border-radius: 0 0 4px 4px;
+}
+
+.eyes {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+}
+
+.eye {
+  width: 4px;
+  height: 4px;
+  background: #2D2D2D;
+  border-radius: 50%;
+  transition: all 0.1s ease;
+}
+
+.eye.blink {
+  transform: scaleY(0.2);
+}
+
+.mouth {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 2px;
+  background: #C41E3A;
+  border-radius: 0 0 3px 3px;
+  transition: all 0.2s ease;
+}
+
+.mouth.smile {
+  width: 6px;
+  height: 2px;
+  border-radius: 0 0 3px 3px;
+}
+
+.mouth.happy {
+  width: 8px;
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+}
+
+.mouth.excited {
+  width: 10px;
+  height: 4px;
+  border-radius: 0 0 5px 5px;
+}
+
+.blush {
+  position: absolute;
+  top: 8px;
+  width: 4px;
+  height: 2px;
+  background: rgba(255, 182, 193, 0.6);
+  border-radius: 2px;
+}
+
+.blush.left { left: 2px; }
+.blush.right { right: 2px; }
+
+.body-clothes {
+  position: absolute;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 28px;
+  background: linear-gradient(180deg, #4A90FF 0%, #1A52CC 100%);
+  border-radius: 4px 4px 2px 2px;
+}
+
+.casual .body-clothes {
+  background: linear-gradient(180deg, #4A90FF 0%, #1A52CC 100%);
+}
+
+.school .body-clothes {
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8E8E8 100%);
+  border: 1px solid #C0C0C0;
+}
+
+.party .body-clothes {
+  background: linear-gradient(180deg, #FF6B9D 0%, #C94BFF 100%);
+  border-radius: 6px 6px 2px 2px;
+}
+
+.princess .body-clothes {
+  background: linear-gradient(180deg, #FFD700 0%, #FFA500 50%, #FF6347 100%);
+  border-radius: 8px 8px 4px 4px;
+}
+
+.angel .body-clothes {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F0F8FF 50%, #E6E6FA 100%);
+  border-radius: 6px 6px 2px 2px;
+}
+
+.legs {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+}
+
+.legs::before,
+.legs::after {
+  content: '';
+  width: 10px;
+  height: 16px;
+  background: linear-gradient(180deg, #333333 0%, #1A1A1A 100%);
+  border-radius: 2px;
+}
+
+.casual .legs::before,
+.casual .legs::after {
+  background: linear-gradient(180deg, #333333 0%, #1A1A1A 100%);
+}
+
+.school .legs::before,
+.school .legs::after {
+  background: linear-gradient(180deg, #1E90FF 0%, #0066CC 100%);
+}
+
+.party .legs::before,
+.party .legs::after {
+  background: linear-gradient(180deg, #4169E1 0%, #1E3A8A 100%);
+}
+
+.princess .legs::before,
+.princess .legs::after {
+  background: linear-gradient(180deg, #FFD700 0%, #FFA500 100%);
+}
+
+.angel .legs::before,
+.angel .legs::after {
+  background: linear-gradient(180deg, #FFFFFF 0%, #E0E0E0 100%);
+}
+
+.accessories {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.school .accessories::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 6px;
+  background: linear-gradient(90deg, #FFD700 0%, #FFA500 50%, #FFD700 100%);
+  border-radius: 3px;
+}
+
+.party .accessories::before {
+  content: '✨';
+  position: absolute;
+  top: 0;
+  left: -8px;
+  font-size: 12px;
+  animation: sparkle 1s ease-in-out infinite;
+}
+
+.party .accessories::after {
+  content: '✨';
+  position: absolute;
+  top: 0;
+  right: -8px;
+  font-size: 12px;
+  animation: sparkle 1s ease-in-out infinite 0.5s;
+}
+
+.princess .accessories::before {
+  content: '👑';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 14px;
+}
+
+.angel .accessories::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: -6px;
+  width: 20px;
+  height: 16px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.2) 100%);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  transform: rotate(-30deg);
+}
+
+.angel .accessories::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  right: -6px;
+  width: 20px;
+  height: 16px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.2) 100%);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  transform: rotate(30deg);
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
+}
+
+.character-shadow {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
 }
 
 .controls-title {
