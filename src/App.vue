@@ -59,6 +59,7 @@
         <div class="board-section">
           <div class="board-wrapper">
             <canvas ref="gameCanvas" width="320" height="640"></canvas>
+            <div class="board-overlay" v-if="!isPlaying"></div>
           </div>
           
           <button class="start-btn glass-btn" @click="startGame" v-if="!isPlaying && !gameOver">
@@ -884,11 +885,22 @@ canvas {
   background: #0a0a15;
 }
 
+.board-overlay {
+  position: absolute;
+  inset: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 8px;
+  z-index: 5;
+}
+
 .start-btn {
   position: absolute;
-  bottom: -60px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  padding: 16px 40px;
+  font-size: 1.2rem;
 }
 
 .right-panel {
