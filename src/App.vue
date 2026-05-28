@@ -856,6 +856,8 @@ onUnmounted(() => {
 
 .board-wrapper {
   position: relative;
+  width: 328px;
+  height: 648px;
   padding: 4px;
   background: linear-gradient(135deg, rgba(201, 75, 255, 0.4), rgba(107, 157, 255, 0.4));
   border-radius: 12px;
@@ -887,8 +889,8 @@ canvas {
 
 .board-overlay {
   position: absolute;
-  inset: 4px;
-  background: rgba(0, 0, 0, 0.7);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
   border-radius: 8px;
   z-index: 5;
 }
@@ -899,8 +901,9 @@ canvas {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 10;
-  padding: 16px 40px;
-  font-size: 1.2rem;
+  padding: 20px 50px;
+  font-size: 1.4rem;
+  white-space: nowrap;
 }
 
 .right-panel {
