@@ -829,7 +829,7 @@ kbd {
   .board-frame { height: 100%; width: auto; aspect-ratio: 328 / 648; }
   .board-frame canvas { width: 100%; height: 100%; display: block; }
   .right-panel { align-items: center; gap: 4px; }
-  .char-box :deep(.char-svg) { width: 100px; height: auto; }
+  .char-box :deep(.char-svg) { width: 120px; height: auto; }
 }
 
 @media (max-width: 900px) {
