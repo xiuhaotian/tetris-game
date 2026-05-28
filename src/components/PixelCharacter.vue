@@ -69,7 +69,7 @@ function loadImages() {
   let pending = files.size
   for (const f of files) {
     const img = new Image()
-    img.onload = () => {
+    img.onload = img.onerror = () => {
       pending--
       if (!pending) { allLoaded = true; draw() }
     }

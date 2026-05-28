@@ -109,14 +109,7 @@
         </div>
       </div>
 
-      <div class="mobile-bottom">
-        <div class="mobile-controls" v-if="showMobileControls">
-          <button class="m-btn" @touchstart.prevent="moveLeft">←</button>
-          <button class="m-btn" @touchstart.prevent="rotate">↻</button>
-          <button class="m-btn" @touchstart.prevent="moveRight">→</button>
-          <button class="m-btn m-btn-accent" @touchstart.prevent="hardDrop">⬇</button>
-        </div>
-      </div>
+
     </div>
 
     <div class="game-over-overlay" v-if="gameOver">
@@ -149,7 +142,6 @@ const highScore = ref(parseInt(localStorage.getItem('tetrisHighScore') || '0'))
 const gameOver = ref(false)
 const isPlaying = ref(false)
 const combo = ref(0)
-const showMobileControls = ref(false)
 const achievements = ref([])
 const currentLang = ref('zh')
 
@@ -470,7 +462,9 @@ const moveDown = () => {
 const gameLoop = (timestamp) => {
   if (!isPlaying.value) return
   drawBoard(timestamp)
-  if (isAiPlaying.value && currentPiece) executeAiMove()
+  if (isAiPlaying.value && currentPiece) {
+    try { executeAiMove() } catch (e) { console.error('AI error', e) }
+  }
   gameFrameId = requestAnimationFrame(gameLoop)
 }
 
@@ -510,8 +504,6 @@ const initBackground = () => {
   }
   animate(0)
 }
-
-const checkMobile = () => { showMobileControls.value = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) }
 
 const toggleLanguage = () => {
   currentLang.value = currentLang.value === 'zh' ? 'en' : 'zh'
@@ -659,7 +651,7 @@ onMounted(() => {
   ctx = gameCanvas.value.getContext('2d'); nextCtx = nextCanvas.value.getContext('2d')
   const savedLang = localStorage.getItem('tetrisLang')
   if (savedLang) currentLang.value = savedLang
-  initBoard(); drawBoard(0); drawNextPiece(); initBackground(); checkMobile()
+  initBoard(); drawBoard(0); drawNextPiece(); initBackground()
 
   actionTimer = setInterval(() => {
     if (isPlaying.value && Math.random() > 0.65) {
@@ -887,23 +879,6 @@ kbd {
 }
 @keyframes pop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
-/* ── Mobile Bottom ── */
-.mobile-bottom { flex-shrink: 0; width: 100%; }
-.mobile-controls {
-  display: none; justify-content: center; gap: 10px;
-  padding: 6px 0 env(safe-area-inset-bottom);
-}
-.m-btn {
-  width: 60px; height: 60px; border-radius: 14px; border: 2px solid rgba(255,255,255,0.15);
-  background: rgba(255,255,255,0.06); color: white; font-size: 1.5rem;
-  cursor: pointer; backdrop-filter: blur(8px); transition: 0.15s;
-}
-.m-btn:active { transform: scale(0.88); background: rgba(201,75,255,0.25); }
-.m-btn-accent {
-  background: linear-gradient(135deg, rgba(201,75,255,0.35), rgba(107,157,255,0.35));
-  border-color: rgba(201,75,255,0.4);
-}
-
 /* ── Game Over ── */
 .game-over-overlay {
   position: fixed; inset: 0; z-index: 200;
@@ -962,7 +937,6 @@ kbd {
   .game-container { gap: 4px; padding: 4px 6px; }
   .stat { padding: 3px 6px; }
   .stat-val { font-size: 0.75rem; }
-  .m-btn { width: 52px; height: 52px; font-size: 1.2rem; }
   .go-title { font-size: 1.6rem; }
   .go-num { font-size: 1.6rem; }
   .board-section { flex: 1; min-height: 0; display: flex; justify-content: center; }
@@ -974,7 +948,4 @@ kbd {
   .ai-btn { font-size: 0.55rem; padding: 3px 10px; }
 }
 
-@media (max-width: 900px) {
-  .mobile-controls { display: flex; }
-}
 </style>
