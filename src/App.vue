@@ -60,23 +60,32 @@
           <div class="board-wrapper">
             <canvas ref="gameCanvas" width="320" height="640"></canvas>
             <div class="board-overlay" v-if="!isPlaying"></div>
+            <div class="board-edge top-left"></div>
+            <div class="board-edge top-right"></div>
+            <div class="board-edge bottom-left"></div>
+            <div class="board-edge bottom-right"></div>
           </div>
           
           <button class="start-btn glass-btn" @click="startGame" v-if="!isPlaying && !gameOver">
             <span class="btn-icon">▶</span>
             <span class="btn-text">{{ t('start') }}</span>
+            <div class="btn-glow"></div>
           </button>
           
           <button class="start-btn glass-btn restart" @click="startGame" v-if="gameOver">
             <span class="btn-icon">↻</span>
             <span class="btn-text">{{ t('restart') }}</span>
+            <div class="btn-glow"></div>
           </button>
         </div>
         
         <div class="right-panel glass-panel">
           <div class="next-piece-container">
             <div class="next-label">{{ t('next') }}</div>
-            <canvas ref="nextCanvas" width="120" height="120"></canvas>
+            <div class="next-canvas-wrapper">
+              <canvas ref="nextCanvas" width="120" height="120"></canvas>
+              <div class="next-glow"></div>
+            </div>
           </div>
           
           <div class="controls-section">
@@ -217,13 +226,13 @@ const translations = {
 const t = (key) => translations[currentLang.value][key] || key
 
 const COLORS = {
-  I: { main: '#00f5ff', dark: '#00a8b8', glow: '#00f5ff' },
-  O: { main: '#ffd700', dark: '#b89900', glow: '#ffd700' },
-  T: { main: '#bf5fff', dark: '#7a00e6', glow: '#bf5fff' },
-  S: { main: '#00ff88', dark: '#00b359', glow: '#00ff88' },
-  Z: { main: '#ff4757', dark: '#cc2936', glow: '#ff4757' },
-  J: { main: '#4a90ff', dark: '#1a52cc', glow: '#4a90ff' },
-  L: { main: '#ff9f43', dark: '#cc7030', glow: '#ff9f43' }
+  I: { main: '#00f5ff', dark: '#00a8b8', glow: '#00f5ff', light: '#80fcff' },
+  O: { main: '#ffd700', dark: '#b89900', glow: '#ffd700', light: '#ffed80' },
+  T: { main: '#bf5fff', dark: '#7a00e6', glow: '#bf5fff', light: '#d98fff' },
+  S: { main: '#00ff88', dark: '#00b359', glow: '#00ff88', light: '#66ffaa' },
+  Z: { main: '#ff4757', dark: '#cc2936', glow: '#ff4757', light: '#ff6b7a' },
+  J: { main: '#4a90ff', dark: '#1a52cc', glow: '#4a90ff', light: '#7aadff' },
+  L: { main: '#ff9f43', dark: '#cc7030', glow: '#ff9f43', light: '#ffb86c' }
 }
 
 const PIECES = [
@@ -259,21 +268,29 @@ const drawBlock = (context, x, y, color, alpha = 1) => {
   
   if (alpha === 1) {
     context.shadowColor = color.glow
-    context.shadowBlur = 15
+    context.shadowBlur = 12
   }
   
   const gradient = context.createLinearGradient(px, py, px + BLOCK_SIZE, py + BLOCK_SIZE)
-  gradient.addColorStop(0, color.main)
+  gradient.addColorStop(0, color.light)
+  gradient.addColorStop(0.5, color.main)
   gradient.addColorStop(1, color.dark)
   
   context.fillStyle = gradient
   context.beginPath()
-  context.roundRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4, 4)
+  context.roundRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4, 5)
   context.fill()
   
   if (alpha === 1) {
-    context.fillStyle = 'rgba(255,255,255,0.3)'
-    context.fillRect(px + 4, py + 4, BLOCK_SIZE - 8, 3)
+    context.fillStyle = 'rgba(255,255,255,0.35)'
+    context.beginPath()
+    context.roundRect(px + 4, py + 4, BLOCK_SIZE - 8, 4, 2)
+    context.fill()
+    
+    context.fillStyle = 'rgba(0,0,0,0.2)'
+    context.beginPath()
+    context.roundRect(px + 4, py + BLOCK_SIZE - 8, BLOCK_SIZE - 8, 4, 2)
+    context.fill()
   }
   
   context.restore()
@@ -282,6 +299,21 @@ const drawBlock = (context, x, y, color, alpha = 1) => {
 const drawBoard = (timestamp) => {
   ctx.fillStyle = '#0a0a15'
   ctx.fillRect(0, 0, BOARD_WIDTH * BLOCK_SIZE, BOARD_HEIGHT * BLOCK_SIZE)
+  
+  ctx.strokeStyle = 'rgba(50, 50, 80, 0.3)'
+  ctx.lineWidth = 1
+  for (let i = 0; i <= BOARD_WIDTH; i++) {
+    ctx.beginPath()
+    ctx.moveTo(i * BLOCK_SIZE, 0)
+    ctx.lineTo(i * BLOCK_SIZE, BOARD_HEIGHT * BLOCK_SIZE)
+    ctx.stroke()
+  }
+  for (let i = 0; i <= BOARD_HEIGHT; i++) {
+    ctx.beginPath()
+    ctx.moveTo(0, i * BLOCK_SIZE)
+    ctx.lineTo(BOARD_WIDTH * BLOCK_SIZE, i * BLOCK_SIZE)
+    ctx.stroke()
+  }
   
   for (let y = 0; y < BOARD_HEIGHT; y++) {
     for (let x = 0; x < BOARD_WIDTH; x++) {
@@ -299,9 +331,9 @@ const drawBoard = (timestamp) => {
         if (cell) {
           ctx.save()
           ctx.strokeStyle = currentPiece.color.main
-          ctx.globalAlpha = 0.3
+          ctx.globalAlpha = 0.35
           ctx.lineWidth = 2
-          ctx.setLineDash([4, 4])
+          ctx.setLineDash([5, 5])
           ctx.strokeRect((x + currentPiece.x) * BLOCK_SIZE + 4, (y + ghostY) * BLOCK_SIZE + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8)
           ctx.restore()
         }
@@ -316,19 +348,23 @@ const drawBoard = (timestamp) => {
   }
   
   particles = particles.filter(p => {
-    p.life -= 0.02
+    p.life -= 0.018
     if (p.life > 0) {
       p.x += p.vx
       p.y += p.vy
-      p.vy += 0.3
+      p.vy += 0.25
+      p.rotation += p.rotationSpeed
       
       ctx.save()
       ctx.globalAlpha = p.life
+      ctx.translate(p.x, p.y)
+      ctx.rotate(p.rotation)
       ctx.fillStyle = p.color
       ctx.shadowColor = p.color
-      ctx.shadowBlur = 10
+      ctx.shadowBlur = 12
       ctx.beginPath()
-      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2)
+      const size = p.size * p.life
+      ctx.arc(0, 0, size, 0, Math.PI * 2)
       ctx.fill()
       ctx.restore()
       return true
@@ -342,7 +378,7 @@ const drawBoard = (timestamp) => {
   }
   
   if (displayScore.value < score.value) {
-    displayScore.value += Math.ceil((score.value - displayScore.value) / 5)
+    displayScore.value += Math.ceil((score.value - displayScore.value) / 4)
   }
 }
 
@@ -374,12 +410,18 @@ const drawNextPiece = () => {
         nextCtx.shadowBlur = 10
         
         const gradient = nextCtx.createLinearGradient(px, py, px + blockSize, py + blockSize)
-        gradient.addColorStop(0, color.main)
+        gradient.addColorStop(0, color.light)
+        gradient.addColorStop(0.5, color.main)
         gradient.addColorStop(1, color.dark)
         
         nextCtx.fillStyle = gradient
         nextCtx.beginPath()
         nextCtx.roundRect(px + 1, py + 1, blockSize - 2, blockSize - 2, 3)
+        nextCtx.fill()
+        
+        nextCtx.fillStyle = 'rgba(255,255,255,0.3)'
+        nextCtx.beginPath()
+        nextCtx.roundRect(px + 2, py + 2, blockSize - 6, 3, 1)
         nextCtx.fill()
       }
     })
@@ -407,15 +449,17 @@ const mergePiece = () => {
     row.forEach((cell, x) => {
       if (cell) {
         board[y + currentPiece.y][x + currentPiece.x] = currentPiece.color.main
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 4; i++) {
           particles.push({
             x: (x + currentPiece.x) * BLOCK_SIZE + BLOCK_SIZE / 2,
             y: (y + currentPiece.y) * BLOCK_SIZE + BLOCK_SIZE / 2,
-            vx: (Math.random() - 0.5) * 6,
-            vy: (Math.random() - 0.5) * 6 - 2,
-            size: Math.random() * 4 + 2,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8 - 3,
+            size: Math.random() * 5 + 3,
             color: currentPiece.color.main,
-            life: 1
+            life: 1,
+            rotation: 0,
+            rotationSpeed: (Math.random() - 0.5) * 0.2
           })
         }
       }
@@ -515,12 +559,13 @@ const initBackground = () => {
   const resize = () => {
     bgCanvas.value.width = window.innerWidth
     bgCanvas.value.height = window.innerHeight
-    stars = Array.from({ length: 80 }, () => ({
+    stars = Array.from({ length: 100 }, () => ({
       x: Math.random() * bgCanvas.value.width,
       y: Math.random() * bgCanvas.value.height,
-      size: Math.random() * 1.5 + 0.5,
-      speed: Math.random() * 0.3 + 0.1,
-      opacity: Math.random()
+      size: Math.random() * 2 + 0.3,
+      speed: Math.random() * 0.25 + 0.05,
+      opacity: Math.random() * 0.7 + 0.3,
+      twinkleSpeed: (Math.random() - 0.5) * 0.02
     }))
   }
   
@@ -529,24 +574,45 @@ const initBackground = () => {
   
   let lastBgUpdate = 0
   const animateBg = (timestamp) => {
-    if (timestamp - lastBgUpdate >= 33) {
+    if (timestamp - lastBgUpdate >= 50) {
       bgCtx.fillStyle = '#050510'
       bgCtx.fillRect(0, 0, bgCanvas.value.width, bgCanvas.value.height)
       
+      const nebula1 = bgCtx.createRadialGradient(
+        bgCanvas.value.width * 0.2, bgCanvas.value.height * 0.3, 0,
+        bgCanvas.value.width * 0.2, bgCanvas.value.height * 0.3, bgCanvas.value.width * 0.3
+      )
+      nebula1.addColorStop(0, 'rgba(191, 95, 255, 0.12)')
+      nebula1.addColorStop(1, 'transparent')
+      bgCtx.fillStyle = nebula1
+      bgCtx.fillRect(0, 0, bgCanvas.value.width, bgCanvas.value.height)
+      
+      const nebula2 = bgCtx.createRadialGradient(
+        bgCanvas.value.width * 0.8, bgCanvas.value.height * 0.7, 0,
+        bgCanvas.value.width * 0.8, bgCanvas.value.height * 0.7, bgCanvas.value.width * 0.25
+      )
+      nebula2.addColorStop(0, 'rgba(74, 144, 255, 0.1)')
+      nebula2.addColorStop(1, 'transparent')
+      bgCtx.fillStyle = nebula2
+      bgCtx.fillRect(0, 0, bgCanvas.value.width, bgCanvas.value.height)
+      
       stars.forEach(star => {
-        star.opacity += (Math.random() - 0.5) * 0.1
+        star.opacity += star.twinkleSpeed
         star.opacity = Math.max(0.2, Math.min(1, star.opacity))
         star.y += star.speed
         if (star.y > bgCanvas.value.height) star.y = 0
       
+        bgCtx.save()
         bgCtx.globalAlpha = star.opacity
         bgCtx.fillStyle = '#fff'
+        bgCtx.shadowColor = '#fff'
+        bgCtx.shadowBlur = star.size * 2
         bgCtx.beginPath()
         bgCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2)
         bgCtx.fill()
+        bgCtx.restore()
       })
       
-      bgCtx.globalAlpha = 1
       lastBgUpdate = timestamp
     }
     
@@ -638,6 +704,10 @@ const handleTouchEnd = (e) => {
   }
 }
 
+const preventScroll = (e) => {
+  e.preventDefault()
+}
+
 onMounted(() => {
   ctx = gameCanvas.value.getContext('2d')
   nextCtx = nextCanvas.value.getContext('2d')
@@ -652,6 +722,9 @@ onMounted(() => {
   checkMobile()
   
   window.addEventListener('keydown', handleKeydown)
+  document.addEventListener('touchmove', preventScroll, { passive: false })
+  document.addEventListener('touchstart', preventScroll, { passive: false })
+  document.addEventListener('wheel', preventScroll, { passive: false })
   
   const gameArea = document.querySelector('.game-area')
   if (gameArea) {
@@ -662,6 +735,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  document.removeEventListener('touchmove', preventScroll)
+  document.removeEventListener('touchstart', preventScroll)
+  document.removeEventListener('wheel', preventScroll)
   cancelAnimationFrame(gameFrameId)
   cancelAnimationFrame(bgFrameId)
   if (comboTimer) clearTimeout(comboTimer)
@@ -680,6 +756,7 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   background: #050510;
+  touch-action: none;
 }
 
 .background-canvas {
@@ -689,6 +766,8 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   z-index: 0;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .language-switcher {
@@ -705,11 +784,13 @@ onUnmounted(() => {
   cursor: pointer;
   z-index: 100;
   transition: all 0.3s ease;
+  transform: translateZ(0);
+  backdrop-filter: blur(12px);
 }
 
 .language-switcher:hover {
   background: rgba(255, 255, 255, 0.15);
-  transform: scale(1.05);
+  transform: scale(1.05) translateZ(0);
 }
 
 .lang-icon { font-size: 1.2rem; }
@@ -742,14 +823,25 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 15px;
+  animation: titleGlow 3s ease-in-out infinite;
+  transform: translateZ(0);
+}
+
+@keyframes titleGlow {
+  0%, 100% { 
+    filter: drop-shadow(0 0 15px rgba(201, 75, 255, 0.3));
+  }
+  50% { 
+    filter: drop-shadow(0 0 35px rgba(107, 157, 255, 0.5));
+  }
 }
 
 .title-icon { font-size: 2rem; animation: bounce 2s ease-in-out infinite; }
 .title-icon:last-child { animation-delay: 1s; }
 
 @keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+  0%, 100% { transform: translateY(0) translateZ(0); }
+  50% { transform: translateY(-8px) translateZ(0); }
 }
 
 .game-subtitle {
@@ -762,8 +854,12 @@ onUnmounted(() => {
 .glass-panel {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
   border-radius: 16px;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transform: translateZ(0);
 }
 
 .glass-btn {
@@ -779,11 +875,29 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  position: relative;
+  overflow: hidden;
+  transform: translateZ(0);
 }
 
 .glass-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 10px 30px rgba(201, 75, 255, 0.3);
+  transform: scale(1.05) translateZ(0);
+  box-shadow: 0 15px 40px rgba(201, 75, 255, 0.4);
+}
+
+.btn-glow {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: btnShine 2.5s ease-in-out infinite;
+}
+
+@keyframes btnShine {
+  0% { transform: translateX(-100%); }
+  50%, 100% { transform: translateX(200%); }
 }
 
 .btn-icon { font-size: 1.2rem; }
@@ -810,6 +924,13 @@ onUnmounted(() => {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.3s ease;
+  transform: translateZ(0);
+}
+
+.stat-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateX(5px) translateZ(0);
 }
 
 .stat-icon { font-size: 1.8rem; }
@@ -834,6 +955,7 @@ onUnmounted(() => {
   background: linear-gradient(135deg, rgba(255, 107, 157, 0.2), rgba(201, 75, 255, 0.2));
   border-radius: 10px;
   animation: pulse 0.5s ease-in-out infinite;
+  transform: translateZ(0);
 }
 
 .combo-text {
@@ -846,8 +968,8 @@ onUnmounted(() => {
 }
 
 @keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.03); }
+  0%, 100% { transform: scale(1) translateZ(0); }
+  50% { transform: scale(1.03) translateZ(0); }
 }
 
 .board-section {
@@ -862,23 +984,72 @@ onUnmounted(() => {
   background: linear-gradient(135deg, rgba(201, 75, 255, 0.4), rgba(107, 157, 255, 0.4));
   border-radius: 12px;
   box-shadow: 0 0 60px rgba(201, 75, 255, 0.2);
+  overflow: hidden;
+  transform: translateZ(0);
 }
 
 .board-wrapper::before {
   content: '';
   position: absolute;
   inset: -2px;
-  background: linear-gradient(45deg, #ff6b9d, #c94bff, #6b9dff);
+  background: linear-gradient(45deg, #ff6b9d, #c94bff, #6b9dff, #ff6b9d);
+  background-size: 400% 400%;
   border-radius: 14px;
   z-index: -1;
-  opacity: 0.3;
-  filter: blur(15px);
-  animation: glow 4s ease-in-out infinite;
+  opacity: 0.35;
+  filter: blur(18px);
+  animation: borderGlow 4s ease-in-out infinite;
 }
 
-@keyframes glow {
-  0%, 100% { opacity: 0.2; }
-  50% { opacity: 0.4; }
+@keyframes borderGlow {
+  0%, 100% { 
+    background-position: 0% 50%;
+    opacity: 0.25; 
+  }
+  50% { 
+    background-position: 100% 50%;
+    opacity: 0.5; 
+  }
+}
+
+.board-edge {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(201, 75, 255, 0.6);
+  z-index: 1;
+}
+
+.board-edge.top-left {
+  top: 8px;
+  left: 8px;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 6px 0 0 0;
+}
+
+.board-edge.top-right {
+  top: 8px;
+  right: 8px;
+  border-left: none;
+  border-bottom: none;
+  border-radius: 0 6px 0 0;
+}
+
+.board-edge.bottom-left {
+  bottom: 8px;
+  left: 8px;
+  border-right: none;
+  border-top: none;
+  border-radius: 0 0 0 6px;
+}
+
+.board-edge.bottom-right {
+  bottom: 8px;
+  right: 8px;
+  border-left: none;
+  border-top: none;
+  border-radius: 0 0 6px 0;
 }
 
 canvas {
@@ -893,6 +1064,7 @@ canvas {
   background: rgba(0, 0, 0, 0.75);
   border-radius: 8px;
   z-index: 5;
+  backdrop-filter: blur(3px);
 }
 
 .start-btn {
@@ -923,9 +1095,24 @@ canvas {
   text-align: center;
 }
 
-.next-piece-container canvas {
+.next-canvas-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.next-canvas-wrapper canvas {
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.next-glow {
+  position: absolute;
+  inset: -3px;
+  background: linear-gradient(135deg, rgba(201, 75, 255, 0.3), rgba(107, 157, 255, 0.3));
+  border-radius: 13px;
+  z-index: -1;
+  filter: blur(10px);
+  opacity: 0.5;
 }
 
 .controls-title {
@@ -953,6 +1140,7 @@ canvas {
   border-radius: 6px;
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .action { color: rgba(255, 255, 255, 0.5); font-size: 0.8rem; }
@@ -976,12 +1164,13 @@ canvas {
   text-align: center;
   margin-bottom: 4px;
   animation: pop 0.3s ease-out;
+  transform: translateZ(0);
 }
 
 @keyframes pop {
-  0% { transform: scale(0.8); opacity: 0; }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); opacity: 1; }
+  0% { transform: scale(0.8) translateZ(0); opacity: 0; }
+  50% { transform: scale(1.05) translateZ(0); }
+  100% { transform: scale(1) translateZ(0); opacity: 1; }
 }
 
 .game-over-overlay {
@@ -993,6 +1182,7 @@ canvas {
   justify-content: center;
   z-index: 200;
   animation: fadeIn 0.3s ease-out;
+  backdrop-filter: blur(5px);
 }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -1004,7 +1194,8 @@ canvas {
   font-weight: 900;
   color: #c41e3a;
   margin-bottom: 15px;
-  text-shadow: 0 0 30px rgba(196, 30, 58, 0.8);
+  text-shadow: 0 0 35px rgba(196, 30, 58, 0.8);
+  transform: translateZ(0);
 }
 
 .final-score { color: rgba(255, 255, 255, 0.6); font-size: 0.9rem; margin-bottom: 8px; }
@@ -1016,6 +1207,7 @@ canvas {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  transform: translateZ(0);
 }
 
 .combo-overlay {
@@ -1034,14 +1226,15 @@ canvas {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-shadow: 0 0 40px rgba(201, 75, 255, 0.6);
+  text-shadow: 0 0 50px rgba(201, 75, 255, 0.6);
+  transform: translateZ(0);
 }
 
 @keyframes comboAnim {
-  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
-  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) translateZ(0); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) translateZ(0); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1) translateZ(0); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.3) translateZ(0); }
 }
 
 .mobile-controls {
@@ -1061,10 +1254,12 @@ canvas {
   color: white;
   cursor: pointer;
   transition: all 0.2s ease;
+  backdrop-filter: blur(8px);
+  transform: translateZ(0);
 }
 
 .mobile-btn:active {
-  transform: scale(0.9);
+  transform: scale(0.9) translateZ(0);
   background: rgba(201, 75, 255, 0.3);
 }
 
