@@ -145,8 +145,8 @@ const showComboEffect = ref(false)
 const comboEffectText = ref('')
 
 const stageNames = {
-  zh: ['JK制服', '脱了外套', '衬衫敞开', '吊带背心', '内衣', '浴巾'],
-  en: ['JK Uniform', 'No Blazer', 'Shirt Open', 'Camisole', 'Lingerie', 'Towel'],
+  zh: ['JK制服', '脱了外套', '衬衫敞开', '吊带背心', '蕾丝内衣', '浴巾'],
+  en: ['JK Uniform', 'No Blazer', 'Shirt Open', 'Camisole', 'Lace Lingerie', 'Towel'],
 }
 const stageThresholds = [0, 500, 1500, 3000, 5000, 8000]
 const characterStage = computed(() => {
