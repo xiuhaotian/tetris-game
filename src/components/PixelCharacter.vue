@@ -1,8 +1,8 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps({
-  outfit: { type: Object, default: () => ({ id: 'casual' }) },
+  stage: { type: Number, default: 0 },
   action: { type: String, default: 'idle' },
 })
 
@@ -16,43 +16,25 @@ let blinkCount = 0
 const W = 112
 const H = 160
 
-const OUTFITS = {
-  casual: {
-    hair: '#8B5A3A', hairLight: '#C49060', hairDark: '#5A3020',
-    skin: '#FDE8D0', skinShadow: '#E8C9A8',
-    eye: '#5A3A6A',
-    top: '#4A88D0', topLight: '#78A8E8', skirt: '#3A3A6A',
-    sock: '#FFFFFF', shoe: '#4A3020',
-  },
-  school: {
-    hair: '#1A1A2E', hairLight: '#3A3A5A', hairDark: '#0A0A1A',
-    skin: '#FDE8D0', skinShadow: '#E8C9A8',
-    eye: '#2A1A4A',
-    top: '#F0F0F0', topLight: '#FFFFFF', skirt: '#1E3A6A',
-    sock: '#FFFFFF', shoe: '#1A1A1A',
-  },
-  party: {
-    hair: '#FF6AA8', hairLight: '#FF90C0', hairDark: '#CC4080',
-    skin: '#FDE8D0', skinShadow: '#E8C9A8',
-    eye: '#7A2060',
-    top: '#FF5AA0', topLight: '#FF80B8', skirt: '#6A3AAA',
-    sock: '#1A0A1A', shoe: '#CC3070',
-  },
-  bikini: {
-    hair: '#C48850', hairLight: '#DTA878', hairDark: '#906030',
-    skin: '#FDE8D0', skinShadow: '#E8C9A8',
-    eye: '#3A6A8A',
-    top: '#FF4058', topLight: '#FF7080', skirt: '#FF4058',
-    sock: '#FFFFFF', shoe: '#FFD700',
-  },
-  princess: {
-    hair: '#E8C040', hairLight: '#FFE070', hairDark: '#C09820',
-    skin: '#FDE8D0', skinShadow: '#E8C9A8',
-    eye: '#4A2A7A',
-    top: '#FFD700', topLight: '#FFE840', skirt: '#FF8A00',
-    sock: '#FFF8E0', shoe: '#FFD700',
-  },
-}
+const SKIN = '#FDE8D0'
+const SKIN_S = '#E8C9A8'
+const SKIN_D = '#D4B090'
+
+const stages = computed(() => {
+  const s = props.stage
+  return {
+    blazer: s < 1,
+    tie: s < 1,
+    shirtClosed: s < 2,
+    skirtLong: s < 1,
+    skirtMid: s >= 1 && s < 3,
+    skirtShort: s >= 3,
+    thighHigh: s >= 2,
+    topOff: s >= 3,
+    braOnly: s >= 4,
+    towel: s >= 5,
+  }
+})
 
 function roundRect(c, x, y, w, h, r) {
   c.beginPath()
@@ -69,287 +51,461 @@ function roundRect(c, x, y, w, h, r) {
 }
 
 function draw(c, t) {
-  const o = OUTFITS[props.outfit.id] || OUTFITS.casual
+  const st = stages.value
 
   const bobY = props.action === 'jump' ? Math.abs(Math.sin(t * 0.012)) * -14
-    : props.action === 'cheer' ? Math.sin(t * 0.008) * -4 + 1
-    : Math.sin(t * 0.002) * 0.8
-  const tilt = props.action === 'dance' ? Math.sin(t * 0.006) * 2
-    : props.action === 'wave' ? Math.sin(t * 0.003) * 4
+    : props.action === 'cheer' ? Math.sin(t * 0.008) * -3 + 1
+    : Math.sin(t * 0.002) * 0.5
+  const tilt = props.action === 'dance' ? Math.sin(t * 0.006) * 3
+    : props.action === 'wave' ? Math.sin(t * 0.003) * 5
     : 0
-  const bodySway = props.action === 'dance' ? Math.sin(t * 0.007) * 2
-    : Math.sin(t * 0.0015 + 1) * 0.8
+  const legShift = props.action === 'dance' ? Math.sin(t * 0.008) * 2
+    : 0
 
   c.save()
   c.clearRect(0, 0, W, H)
-  c.translate(W / 2, H / 2 + 10 + bobY)
+  c.translate(W / 2, H / 2 + 8 + bobY)
   c.rotate(tilt * Math.PI / 180)
 
-  // ── Hair (back) ──
-  c.fillStyle = o.hairDark
-  roundRect(c, -18, -48, 36, 48, 10)
+  // ── Back Hair ──
+  c.fillStyle = '#1A1A2E'
+  // long flowing hair reaching shoulders
+  roundRect(c, -20, -48, 40, 56, 10)
   c.fill()
-  // hair sides
-  c.fillRect(-22, -38, 8, 36)
-  c.fillRect(14, -38, 8, 36)
-  // hair bottom wisps
+  // hair side strands
   c.beginPath()
-  c.ellipse(-18, -8, 6, 10, -0.2, 0, Math.PI * 2)
+  c.ellipse(-22, -30, 7, 30, -0.1, 0, Math.PI * 2)
   c.fill()
   c.beginPath()
-  c.ellipse(18, -8, 6, 10, 0.2, 0, Math.PI * 2)
+  c.ellipse(22, -30, 7, 30, 0.1, 0, Math.PI * 2)
+  c.fill()
+  // long back strands (long hair)
+  c.fillRect(-22, -20, 8, 44)
+  c.fillRect(14, -20, 8, 44)
+
+  // ── Legs (behind skirt) ──
+  c.fillStyle = SKIN
+  c.fillRect(-8 + legShift, 40, 6.5, 18)
+  c.fillRect(1.5 + legShift, 40, 6.5, 18)
+
+  if (st.thighHigh) {
+    // thigh-high stockings
+    c.fillStyle = '#1A1A2E'
+    c.fillRect(-8 + legShift, 49, 6.5, 9)
+    c.fillRect(1.5 + legShift, 49, 6.5, 9)
+    // stocking top band
+    c.fillStyle = '#FF88AA'
+    c.fillRect(-8 + legShift, 49, 6.5, 2)
+    c.fillRect(1.5 + legShift, 49, 6.5, 2)
+    // bare thigh above stockings
+    c.fillStyle = SKIN
+    c.fillRect(-8 + legShift, 40, 6.5, 9)
+    c.fillRect(1.5 + legShift, 40, 6.5, 9)
+  } else {
+    // knee socks
+    c.fillStyle = '#FFFFFF'
+    c.fillRect(-8 + legShift, 48, 6.5, 7)
+    c.fillRect(1.5 + legShift, 48, 6.5, 7)
+  }
+
+  // shoes
+  c.fillStyle = '#1A1A1A'
+  roundRect(c, -9 + legShift, 56, 8, 5, 2)
+  c.fill()
+  roundRect(c, 1 + legShift, 56, 8, 5, 2)
   c.fill()
 
-  // ── Body / Clothes (behind arms) ──
-  if (props.outfit.id === 'bikini') {
-    // bikini bottom
-    c.fillStyle = o.skirt
-    roundRect(c, -10, 18, 20, 12, 4)
+  // ── Body / Torso ──
+  // Bare skin for torso (covered by clothes)
+  c.fillStyle = SKIN
+  // upper torso (midriff area visible when top is off)
+  if (st.towel) {
+    // towel wrap
+    c.fillStyle = '#FFFFFF'
+    roundRect(c, -14, 8, 28, 24, 4)
+    c.fill()
+    // towel folds
+    c.strokeStyle = 'rgba(200,200,200,0.4)'
+    c.lineWidth = 0.5
+    for (let i = 0; i < 3; i++) {
+      c.beginPath()
+      c.moveTo(-12, 12 + i * 6)
+      c.lineTo(12, 12 + i * 6)
+      c.stroke()
+    }
+    // bare shoulders
+    c.fillStyle = SKIN
+    roundRect(c, -18, 6, 6, 6, 3)
+    c.fill()
+    roundRect(c, 12, 6, 6, 6, 3)
+    c.fill()
+  } else if (st.braOnly) {
+    // lingerie set
+    c.fillStyle = SKIN
+    roundRect(c, -11, 4, 22, 22, 3)
+    c.fill()
+    // bra
+    c.fillStyle = '#1A1A2E'
+    c.beginPath()
+    c.ellipse(-6, 8, 8, 7, -0.2, 0, Math.PI * 2)
+    c.fill()
+    c.beginPath()
+    c.ellipse(6, 8, 8, 7, 0.2, 0, Math.PI * 2)
+    c.fill()
+    // bra center
+    c.fillRect(-2, 6, 4, 6)
+    // bra lace detail
+    c.fillStyle = '#FF88AA'
+    c.beginPath()
+    c.ellipse(-6, 8, 4, 3, -0.2, 0, Math.PI * 2)
+    c.fill()
+    c.beginPath()
+    c.ellipse(6, 8, 4, 3, 0.2, 0, Math.PI * 2)
+    c.fill()
+    // panties
+    c.fillStyle = '#1A1A2E'
+    roundRect(c, -8, 18, 16, 10, 4)
+    c.fill()
+    c.fillStyle = '#FF88AA'
+    roundRect(c, -6, 19, 12, 4, 2)
     c.fill()
     // bare midriff
-    c.fillStyle = o.skin
-    roundRect(c, -9, 6, 18, 14, 3)
+    c.fillStyle = SKIN
+    c.fillRect(-10, 12, 20, 7)
+  } else if (st.topOff) {
+    // corset/cami top
+    c.fillStyle = SKIN
+    roundRect(c, -11, 4, 22, 22, 3)
     c.fill()
-  } else if (props.outfit.id === 'princess') {
-    c.fillStyle = o.skirt
-    roundRect(c, -18, 20, 36, 28, 6)
+    // corset top
+    c.fillStyle = '#1A1A2E'
+    roundRect(c, -10, 4, 20, 16, 4)
     c.fill()
-    c.fillStyle = o.top
-    roundRect(c, -14, 4, 28, 22, 5)
+    // lace trim
+    c.fillStyle = '#FF88AA'
+    c.fillRect(-10, 17, 20, 3)
+    // cleavage
+    c.fillStyle = SKIN_S
+    c.beginPath()
+    c.ellipse(-4, 9, 4, 5, -0.3, 0, Math.PI * 2)
     c.fill()
-  } else if (props.outfit.id === 'party') {
-    c.fillStyle = o.skirt
-    roundRect(c, -16, 18, 32, 30, 8)
-    c.fill()
-    c.fillStyle = o.top
-    roundRect(c, -12, 4, 24, 20, 5)
+    c.beginPath()
+    c.ellipse(4, 9, 4, 5, 0.3, 0, Math.PI * 2)
     c.fill()
   } else {
-    // top
-    c.fillStyle = o.top
-    roundRect(c, -12, 4, 24, 20, 5)
+    // shirt body
+    c.fillStyle = '#FFFFFF'
+    roundRect(c, -12, 4, 24, 24, 4)
     c.fill()
-    c.fillStyle = o.topLight
-    roundRect(c, -10, 6, 20, 6, 3)
+    if (st.shirtClosed) {
+      // shirt buttons
+      c.fillStyle = '#D4D4D4'
+      c.beginPath(); c.arc(0, 8, 1, 0, Math.PI * 2); c.fill()
+      c.beginPath(); c.arc(0, 12, 1, 0, Math.PI * 2); c.fill()
+      c.beginPath(); c.arc(0, 16, 1, 0, Math.PI * 2); c.fill()
+      c.beginPath(); c.arc(0, 20, 1, 0, Math.PI * 2); c.fill()
+    } else {
+      // shirt partially open — cleavage visible
+      c.fillStyle = SKIN
+      roundRect(c, -4, 6, 8, 14, 3)
+      c.fill()
+      // shadow line
+      c.fillStyle = SKIN_S
+      c.beginPath()
+      c.ellipse(-2, 10, 3, 4, -0.2, 0, Math.PI * 2)
+      c.fill()
+      c.beginPath()
+      c.ellipse(2, 10, 3, 4, 0.2, 0, Math.PI * 2)
+      c.fill()
+    }
+  }
+
+  // ── Arms ──
+  const armSwing = Math.sin(t * 0.0015) * 0.5
+  c.fillStyle = SKIN
+  // left arm
+  c.save()
+  c.translate(-16, 8)
+  c.rotate(-0.3 + armSwing)
+  roundRect(c, -3, 0, 6, 22, 3)
+  c.fill()
+  if (!st.blazer) {
+    // rolled sleeve
+    c.fillStyle = '#FFFFFF'
+    roundRect(c, -3, 8, 6, 6, 2)
     c.fill()
-    // skirt
-    c.fillStyle = o.skirt
-    roundRect(c, -14, 22, 28, 16, 3)
+    c.fillStyle = '#E8E8E8'
+    c.fillRect(-3, 8, 6, 2)
+  }
+  c.restore()
+  // right arm
+  c.save()
+  c.translate(16, 8)
+  c.rotate(0.3 - armSwing)
+  roundRect(c, -3, 0, 6, 22, 3)
+  c.fill()
+  if (!st.blazer) {
+    c.fillStyle = '#FFFFFF'
+    roundRect(c, -3, 8, 6, 6, 2)
+    c.fill()
+    c.fillStyle = '#E8E8E8'
+    c.fillRect(-3, 8, 6, 2)
+  }
+  c.restore()
+
+  // ── Blazer ──
+  if (st.blazer) {
+    c.fillStyle = '#1E3A6A'
+    // blazer body
+    roundRect(c, -14, 3, 28, 28, 5)
+    c.fill()
+    // collar
+    c.fillStyle = '#2A5090'
+    c.beginPath()
+    c.moveTo(-6, 4); c.lineTo(-2, 12); c.lineTo(-6, 14); c.closePath()
+    c.fill()
+    c.beginPath()
+    c.moveTo(6, 4); c.lineTo(2, 12); c.lineTo(6, 14); c.closePath()
+    c.fill()
+    // lapel edge
+    c.strokeStyle = '#153060'
+    c.lineWidth = 0.5
+    c.beginPath()
+    c.moveTo(-5, 4); c.lineTo(-3, 14); c.lineTo(-10, 18)
+    c.stroke()
+    c.beginPath()
+    c.moveTo(5, 4); c.lineTo(3, 14); c.lineTo(10, 18)
+    c.stroke()
+  }
+
+  // ── Tie ──
+  if (st.tie) {
+    c.fillStyle = '#CC2233'
+    roundRect(c, -2, 6, 4, 20, 1)
+    c.fill()
+    // tie knot
+    c.fillStyle = '#AA1A28'
+    roundRect(c, -2.5, 5, 5, 4, 1.5)
+    c.fill()
+  } else if (!st.topOff && !st.braOnly && !st.towel) {
+    // loose hanging tie
+    c.fillStyle = '#CC2233'
+    roundRect(c, -2, 6, 4, 22, 1)
+    c.fill()
+    c.fillStyle = '#AA1A28'
+    roundRect(c, -2.5, 5, 5, 4, 1.5)
     c.fill()
   }
 
-  // ── Legs ──
-  c.fillStyle = o.skin
-  c.fillRect(-9, 36, 7, 18)
-  c.fillRect(2, 36, 7, 18)
-  // socks
-  c.fillStyle = o.sock
-  c.fillRect(-9, 48, 7, 8)
-  c.fillRect(2, 48, 7, 8)
-  // shoes
-  c.fillStyle = o.shoe
-  roundRect(c, -10, 55, 9, 5, 2)
-  c.fill()
-  roundRect(c, 1, 55, 9, 5, 2)
-  c.fill()
-
-  // ── Arms ──
-  const armSwing = bodySway * 0.5
-  c.fillStyle = o.skin
-  c.save()
-  c.translate(-16, 8)
-  c.rotate(-0.4 + Math.sin(t * 0.001 + armSwing) * 0.1)
-  roundRect(c, -3, 0, 6, 18, 3)
-  c.fill()
-  c.restore()
-  c.save()
-  c.translate(16, 8)
-  c.rotate(0.4 - Math.sin(t * 0.001 + armSwing) * 0.1)
-  roundRect(c, -3, 0, 6, 18, 3)
-  c.fill()
-  c.restore()
+  // ── Skirt ──
+  if (st.towel) {
+    // towel covers lower body
+    c.fillStyle = '#FFFFFF'
+    roundRect(c, -16, 22, 32, 20, 4)
+    c.fill()
+    c.strokeStyle = 'rgba(200,200,200,0.4)'
+    c.lineWidth = 0.5
+    for (let i = 0; i < 3; i++) {
+      c.beginPath()
+      c.moveTo(-14, 24 + i * 5)
+      c.lineTo(14, 24 + i * 5)
+      c.stroke()
+    }
+  } else if (st.braOnly) {
+    // just panties (already drawn above)
+  } else if (st.skirtShort) {
+    // mini skirt
+    c.fillStyle = '#1E3A6A'
+    roundRect(c, -14, 22, 28, 10, 3)
+    c.fill()
+    // plaid pattern
+    c.strokeStyle = '#2A5090'
+    c.lineWidth = 0.5
+    c.beginPath(); c.moveTo(-8, 22); c.lineTo(-8, 32); c.stroke()
+    c.beginPath(); c.moveTo(0, 22); c.lineTo(0, 32); c.stroke()
+    c.beginPath(); c.moveTo(8, 22); c.lineTo(8, 32); c.stroke()
+    // visible thigh
+    c.fillStyle = SKIN
+    c.fillRect(-8, 32, 16, 8 + legShift)
+  } else if (st.skirtMid) {
+    // mid thigh skirt
+    c.fillStyle = '#1E3A6A'
+    roundRect(c, -14, 22, 28, 16, 3)
+    c.fill()
+    c.strokeStyle = '#2A5090'
+    c.lineWidth = 0.5
+    c.beginPath(); c.moveTo(-8, 22); c.lineTo(-8, 38); c.stroke()
+    c.beginPath(); c.moveTo(0, 22); c.lineTo(0, 38); c.stroke()
+    c.beginPath(); c.moveTo(8, 22); c.lineTo(8, 38); c.stroke()
+  } else {
+    // long pleated skirt (full JK)
+    c.fillStyle = '#1E3A6A'
+    roundRect(c, -14, 22, 28, 20, 3)
+    c.fill()
+    c.strokeStyle = '#2A5090'
+    c.lineWidth = 0.5
+    c.beginPath(); c.moveTo(-8, 22); c.lineTo(-8, 42); c.stroke()
+    c.beginPath(); c.moveTo(0, 22); c.lineTo(0, 42); c.stroke()
+    c.beginPath(); c.moveTo(8, 22); c.lineTo(8, 42); c.stroke()
+  }
 
   // ── Neck ──
-  c.fillStyle = o.skinShadow
+  c.fillStyle = SKIN_S
   c.fillRect(-4, -6, 8, 10)
 
+  // ── Collar ──
+  if (st.shirtClosed) {
+    c.fillStyle = '#FFFFFF'
+    c.beginPath()
+    c.moveTo(-3, -5); c.lineTo(0, -2); c.lineTo(3, -5); c.closePath()
+    c.fill()
+  }
+
   // ── Head ──
-  c.fillStyle = o.skin
+  c.fillStyle = SKIN
   c.beginPath()
-  c.ellipse(0, -20, 15, 17, 0, 0, Math.PI * 2)
+  c.ellipse(0, -22, 15, 18, 0, 0, Math.PI * 2)
   c.fill()
 
   // ── Hair (front / bangs) ──
-  c.fillStyle = o.hair
+  c.fillStyle = '#1A1A2E'
   // main hair top
   c.beginPath()
-  c.ellipse(0, -30, 17, 14, 0, 0, Math.PI * 2)
+  c.ellipse(0, -33, 17, 15, 0, 0, Math.PI * 2)
   c.fill()
-  // bangs
+  // side-swept bangs
   c.beginPath()
-  c.ellipse(-6, -26, 8, 7, -0.3, -Math.PI * 0.5, Math.PI * 0.5)
+  c.ellipse(-8, -27, 10, 8, -0.4, 0, Math.PI * 2)
   c.fill()
   c.beginPath()
-  c.ellipse(6, -26, 8, 7, 0.3, -Math.PI * 0.5, Math.PI * 0.5)
+  c.ellipse(6, -26, 9, 7, 0.3, 0, Math.PI * 2)
   c.fill()
-  // hair sides overlapping face
-  c.fillRect(-17, -26, 4, 14)
-  c.fillRect(13, -26, 4, 14)
-  // hair highlight
-  c.fillStyle = o.hairLight
-  roundRect(c, -6, -36, 12, 4, 2)
+  // hair sides
+  c.fillRect(-18, -28, 5, 18)
+  c.fillRect(13, -28, 5, 18)
+  // hair shine
+  c.fillStyle = '#2A2A4E'
+  roundRect(c, -5, -38, 10, 4, 2)
   c.fill()
+  c.fillRect(-4, -34, 1, 12)
+  c.fillRect(3, -34, 1, 10)
 
-  // ── Eyes ──
-  const eyeY = -22
+  // ── Eyes (big anime, sultry) ──
+  const eyeY = -24
   // eye whites
   c.fillStyle = '#FFFFFF'
   c.beginPath()
-  c.ellipse(-6, eyeY, 5, 6, 0, 0, Math.PI * 2)
+  c.ellipse(-6, eyeY, 6, 7, 0, 0, Math.PI * 2)
   c.fill()
   c.beginPath()
-  c.ellipse(6, eyeY, 5, 6, 0, 0, Math.PI * 2)
+  c.ellipse(6, eyeY, 6, 7, 0, 0, Math.PI * 2)
   c.fill()
 
   if (!blink) {
-    // iris
-    c.fillStyle = o.eye
+    // iris (large, seductive)
+    c.fillStyle = '#3A2A6A'
     c.beginPath()
-    c.ellipse(-6, eyeY + 1, 3.5, 4, 0, 0, Math.PI * 2)
+    c.ellipse(-6, eyeY + 1, 4, 5, 0, 0, Math.PI * 2)
     c.fill()
     c.beginPath()
-    c.ellipse(6, eyeY + 1, 3.5, 4, 0, 0, Math.PI * 2)
+    c.ellipse(6, eyeY + 1, 4, 5, 0, 0, Math.PI * 2)
     c.fill()
     // pupil
     c.fillStyle = '#0A0A1A'
     c.beginPath()
-    c.ellipse(-6, eyeY + 1, 2, 2.5, 0, 0, Math.PI * 2)
+    c.ellipse(-6, eyeY + 1, 2.5, 3.5, 0, 0, Math.PI * 2)
     c.fill()
     c.beginPath()
-    c.ellipse(6, eyeY + 1, 2, 2.5, 0, 0, Math.PI * 2)
+    c.ellipse(6, eyeY + 1, 2.5, 3.5, 0, 0, Math.PI * 2)
     c.fill()
     // eye highlights
     c.fillStyle = '#FFFFFF'
     c.beginPath()
-    c.arc(-4, eyeY - 1, 1.5, 0, Math.PI * 2)
+    c.arc(-4, eyeY - 2, 2, 0, Math.PI * 2)
     c.fill()
     c.beginPath()
-    c.arc(8, eyeY - 1, 1.5, 0, Math.PI * 2)
+    c.arc(8, eyeY - 2, 2, 0, Math.PI * 2)
     c.fill()
     // small highlight
     c.beginPath()
-    c.arc(-8, eyeY + 3, 0.8, 0, Math.PI * 2)
+    c.arc(-8, eyeY + 4, 1, 0, Math.PI * 2)
     c.fill()
     c.beginPath()
-    c.arc(4, eyeY + 3, 0.8, 0, Math.PI * 2)
+    c.arc(4, eyeY + 4, 1, 0, Math.PI * 2)
     c.fill()
-    // upper eyelashes
-    c.strokeStyle = '#1A1A1A'
-    c.lineWidth = 1.5
+    // long upper eyelashes (seductive look)
+    c.strokeStyle = '#0A0A1A'
+    c.lineWidth = 1.8
     c.beginPath()
-    c.arc(-6, eyeY - 5.5, 4.5, Math.PI * 1.1, Math.PI * 1.9)
+    c.arc(-6, eyeY - 6.5, 5.5, Math.PI * 1.05, Math.PI * 1.95)
     c.stroke()
     c.beginPath()
-    c.arc(6, eyeY - 5.5, 4.5, Math.PI * 1.1, Math.PI * 1.9)
+    c.arc(6, eyeY - 6.5, 5.5, Math.PI * 1.05, Math.PI * 1.95)
+    c.stroke()
+    // lower lashes (subtle)
+    c.lineWidth = 0.8
+    c.beginPath()
+    c.arc(-6, eyeY + 6.5, 5, Math.PI * -0.1, Math.PI * 0.1)
+    c.stroke()
+    c.beginPath()
+    c.arc(6, eyeY + 6.5, 5, Math.PI * -0.1, Math.PI * 0.1)
     c.stroke()
   }
 
-  // ── Blush ──
-  c.fillStyle = 'rgba(255,150,160,0.45)'
+  // ── Eyebrows (arched, seductive) ──
+  c.strokeStyle = '#0A0A1A'
+  c.lineWidth = 1.2
   c.beginPath()
-  c.ellipse(-9, -15, 3.5, 2, 0, 0, Math.PI * 2)
-  c.fill()
-  c.beginPath()
-  c.ellipse(9, -15, 3.5, 2, 0, 0, Math.PI * 2)
-  c.fill()
-
-  // ── Mouth ──
-  c.fillStyle = '#D44050'
-  c.beginPath()
-  c.arc(0, -12, 2.5, 0.1, Math.PI - 0.1)
-  c.fill()
-
-  // ── Eyebrows ──
-  c.strokeStyle = o.hairDark
-  c.lineWidth = 1.5
-  c.beginPath()
-  c.moveTo(-10, -28)
-  c.quadraticCurveTo(-8, -30, -5, -29)
+  c.moveTo(-11, -31)
+  c.quadraticCurveTo(-8, -34, -4, -33)
   c.stroke()
   c.beginPath()
-  c.moveTo(10, -28)
-  c.quadraticCurveTo(8, -30, 5, -29)
+  c.moveTo(11, -31)
+  c.quadraticCurveTo(8, -34, 4, -33)
   c.stroke()
 
-  // ── Princess Crown ──
-  if (props.outfit.id === 'princess') {
-    c.fillStyle = '#FFD700'
-    c.strokeStyle = '#D4A000'
-    c.lineWidth = 1
-    // crown base
-    roundRect(c, -10, -44, 20, 7, 2)
-    c.fill()
-    // crown points
+  // ── Blush (subtle sexy flush) ──
+  c.fillStyle = 'rgba(255,140,150,0.5)'
+  c.beginPath()
+  c.ellipse(-10, -16, 4, 2.5, 0, 0, Math.PI * 2)
+  c.fill()
+  c.beginPath()
+  c.ellipse(10, -16, 4, 2.5, 0, 0, Math.PI * 2)
+  c.fill()
+
+  // ── Mouth (full, seductive pout) ──
+  c.fillStyle = '#D43850'
+  c.beginPath()
+  c.moveTo(-4, -11)
+  c.quadraticCurveTo(0, -8, 4, -11)
+  c.quadraticCurveTo(0, -6, -4, -11)
+  c.fill()
+  // lower lip highlight
+  c.fillStyle = '#E06070'
+  c.beginPath()
+  c.arc(0, -10, 1.2, 0, Math.PI)
+  c.fill()
+
+  // ── Ribbon ──
+  if (st.shirtClosed || props.stage < 2) {
+    c.fillStyle = '#CC2233'
     c.beginPath()
-    c.moveTo(-9, -44)
-    c.lineTo(-7, -52)
-    c.lineTo(-3, -44)
-    c.lineTo(0, -54)
-    c.lineTo(3, -44)
-    c.lineTo(7, -52)
-    c.lineTo(9, -44)
-    c.closePath()
+    c.moveTo(-4, -4); c.lineTo(0, 2); c.lineTo(4, -4); c.closePath()
     c.fill()
-    // gems
-    c.fillStyle = '#FF4070'
-    c.beginPath()
-    c.arc(-5, -42, 1.5, 0, Math.PI * 2)
-    c.fill()
-    c.beginPath()
-    c.arc(0, -42, 1.5, 0, Math.PI * 2)
-    c.fill()
-    c.beginPath()
-    c.arc(5, -42, 1.5, 0, Math.PI * 2)
-    c.fill()
+    c.fillRect(-1, -4, 2, 10)
   }
 
-  // ── School ribbon ──
-  if (props.outfit.id === 'school') {
-    c.fillStyle = '#FF4058'
-    c.beginPath()
-    c.moveTo(-3, -4)
-    c.lineTo(0, 2)
-    c.lineTo(3, -4)
-    c.closePath()
-    c.fill()
-    c.fillRect(-1, -4, 2, 8)
-  }
-
-  // ── Bikini top ──
-  if (props.outfit.id === 'bikini') {
-    c.fillStyle = o.top
-    // left cup
-    c.beginPath()
-    c.ellipse(-6, 6, 7, 6, -0.2, 0, Math.PI * 2)
-    c.fill()
-    // right cup
-    c.beginPath()
-    c.ellipse(6, 6, 7, 6, 0.2, 0, Math.PI * 2)
-    c.fill()
-    // highlight
-    c.fillStyle = o.topLight
-    c.beginPath()
-    c.ellipse(-5, 4, 3, 2.5, -0.2, 0, Math.PI * 2)
-    c.fill()
-    c.beginPath()
-    c.ellipse(7, 4, 3, 2.5, 0.2, 0, Math.PI * 2)
-    c.fill()
-  } else {
-    // normal top bust line
-    c.fillStyle = o.topLight
-    roundRect(c, -8, 8, 16, 4, 2)
-    c.fill()
-  }
+  // ── Stage label ──
+  c.fillStyle = 'rgba(255,255,255,0.25)'
+  c.font = '6px monospace'
+  c.textAlign = 'center'
+  c.textBaseline = 'bottom'
+  let stageLabel = 'JK制服'
+  if (props.stage >= 5) stageLabel = '♥♥♥'
+  else if (props.stage >= 4) stageLabel = '♥♥'
+  else if (props.stage >= 3) stageLabel = '♥'
+  else if (props.stage >= 2) stageLabel = '♥'
+  c.fillText(stageLabel, 0, H / 2 - H / 2 - 2)
 
   c.restore()
 }
@@ -359,10 +515,10 @@ function render(timestamp) {
   const t = timestamp - startTime
 
   blinkCount++
-  if (blinkCount > 140 + Math.random() * 60) {
+  if (blinkCount > 120 + Math.random() * 80) {
     blink = true
     blinkCount = 0
-    setTimeout(() => { blink = false }, 100)
+    setTimeout(() => { blink = false }, 120)
   }
 
   draw(ctx, t)

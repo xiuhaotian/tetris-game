@@ -75,9 +75,9 @@
           </div>
 
           <div class="char-box">
-            <div class="panel-label">{{ currentOutfit.name }}</div>
+            <div class="panel-label">{{ stageNames[currentLang][characterStage] || 'JK制服' }}</div>
             <div class="char-canvas-wrap">
-              <PixelCharacter :outfit="currentOutfit" :action="characterAction" />
+              <PixelCharacter :stage="characterStage" :action="characterAction" />
             </div>
           </div>
 
@@ -122,7 +122,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import PixelCharacter from './components/PixelCharacter.vue'
 
 const gameCanvas = ref(null)
@@ -144,15 +144,16 @@ const currentLang = ref('zh')
 const showComboEffect = ref(false)
 const comboEffectText = ref('')
 
-const outfits = [
-  { id: 'casual', name: '休闲装', score: 0 },
-  { id: 'school', name: '学生装', score: 400 },
-  { id: 'party', name: '派对装', score: 1000 },
-  { id: 'bikini', name: '比基尼', score: 2000 },
-  { id: 'princess', name: '公主装', score: 3500 }
-]
-
-const currentOutfit = ref(outfits[0])
+const stageNames = {
+  zh: ['JK制服', '脱了外套', '衬衫敞开', '吊带背心', '内衣', '浴巾'],
+  en: ['JK Uniform', 'No Blazer', 'Shirt Open', 'Camisole', 'Lingerie', 'Towel'],
+}
+const stageThresholds = [0, 500, 1500, 3000, 5000, 8000]
+const characterStage = computed(() => {
+  for (let i = stageThresholds.length - 1; i >= 0; i--)
+    if (score.value >= stageThresholds[i]) return i
+  return 0
+})
 const characterAction = ref('idle')
 
 let ctx = null, nextCtx = null, bgCtx = null
@@ -409,7 +410,7 @@ const clearLines = () => {
       comboEffectText.value = `${combo.value}x COMBO! +${Math.floor(points)}`
       setTimeout(() => showComboEffect.value = false, 800)
     }
-    updateOutfit()
+    updateStage()
   }
 }
 
@@ -489,16 +490,11 @@ const toggleLanguage = () => {
   localStorage.setItem('tetrisLang', currentLang.value)
 }
 
-const updateOutfit = () => {
-  for (let i = outfits.length - 1; i >= 0; i--) {
-    if (score.value >= outfits[i].score) {
-      if (currentOutfit.value.id !== outfits[i].id) {
-        currentOutfit.value = outfits[i]
-        characterAction.value = 'cheer'
-        setTimeout(() => { characterAction.value = 'idle' }, 1500)
-      }
-      break
-    }
+const updateStage = () => {
+  const newStage = characterStage.value
+  if (newStage > 0) {
+    characterAction.value = 'cheer'
+    setTimeout(() => { characterAction.value = 'idle' }, 1500)
   }
 }
 
@@ -506,7 +502,7 @@ const startGame = () => {
   initBoard(); score.value = 0; displayScore.value = 0; level.value = 1
   lines.value = 0; dropInterval = 1000; gameOver.value = false; isPlaying.value = true
   particles = []; combo.value = 0; achievements.value = []
-  currentOutfit.value = outfits[0]; characterAction.value = 'idle'
+  characterAction.value = 'idle'
   currentPiece = createPiece(); nextPiece = createPiece(); drawNextPiece()
   lastDropTime = performance.now(); gameFrameId = requestAnimationFrame(gameLoop)
 }
@@ -806,25 +802,22 @@ kbd {
 /* ── Responsive ── */
 @media (max-width: 780px) {
   .game-container { max-width: 100%; padding: 6px 10px; overflow-x: hidden; }
-  .main-area { flex-direction: column; align-items: center; gap: 8px; }
-  .left-panel { width: auto; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 3px; }
+  .main-area { flex-direction: column; align-items: center; gap: 6px; }
+  .left-panel { width: auto; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 3px; order: 1; }
   .left-panel .stat { padding: 5px 8px; gap: 5px; }
   .left-panel .stat-icon { font-size: 0.85rem; }
   .left-panel .stat-val { font-size: 0.85rem; }
   .left-panel .stat-label { font-size: 0.5rem; }
-  .left-panel { order: 2; }
-  .board-section { order: 1; }
-  .right-panel { order: 3; width: auto; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 6px; }
+  .right-panel { order: 2; width: auto; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 6px; }
   .right-panel .next-box { display: none; }
   .right-panel .ctrl-box { display: none; }
   .right-panel .achieve-box { display: none; }
+  .board-section { order: 3; }
 }
 
 @media (max-width: 600px) {
   .title { font-size: 1.3rem; }
   .subtitle { display: none; }
-  .board-frame { width: calc(100vw - 24px); height: calc((100vw - 24px) * 1.975); }
-  .board-frame canvas { width: 100%; height: 100%; }
   .lang-switch { top: 8px; right: 8px; width: 34px; height: 34px; font-size: 1rem; }
   .game-container { gap: 4px; padding: 4px 6px; }
   .stat { padding: 3px 6px; }
@@ -832,6 +825,11 @@ kbd {
   .m-btn { width: 52px; height: 52px; font-size: 1.2rem; }
   .go-title { font-size: 1.6rem; }
   .go-num { font-size: 1.6rem; }
+  .board-section { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; }
+  .board-frame { width: auto; height: 100%; aspect-ratio: 328 / 648; }
+  .board-frame canvas { width: 100%; height: 100%; }
+  .right-panel { align-items: center; gap: 4px; }
+  .char-box canvas { width: 85px; height: auto; }
 }
 
 @media (max-width: 900px) {
