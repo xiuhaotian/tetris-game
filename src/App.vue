@@ -617,7 +617,7 @@ onUnmounted(() => {
   position: relative; z-index: 1;
   display: flex; flex-direction: column; align-items: center;
   padding: 8px 16px; gap: 8px;
-  width: 100%; max-width: 820px;
+  width: 100%; max-width: 860px;
   height: 100dvh; max-height: 100dvh;
   box-sizing: border-box;
 }
@@ -649,7 +649,7 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 .left-panel { width: 110px; gap: 4px; }
-.right-panel { width: 150px; gap: 6px; }
+.right-panel { width: 180px; gap: 6px; }
 
 .stat {
   position: relative;
