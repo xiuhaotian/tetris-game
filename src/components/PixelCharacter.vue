@@ -92,6 +92,16 @@ function loadImages() {
   if (files.size === 0) allLoaded = true
 }
 
+function fit(img, ctx) {
+  if (!img) return
+  const srcAR = img.naturalWidth / img.naturalHeight
+  const dstAR = CW / CH
+  let dx = 0, dy = 0, dw = CW, dh = CH
+  if (srcAR > dstAR) { dh = CW / srcAR; dy = (CH - dh) / 2 }
+  else { dw = CH * srcAR; dx = (CW - dw) / 2 }
+  ctx.drawImage(img, dx, dy, dw, dh)
+}
+
 function draw() {
   const canvas = cvs.value
   if (!canvas || !allLoaded) return
@@ -100,14 +110,10 @@ function draw() {
   const cfg = data.stages[props.stage] || data.stages[0]
   const p = data.prefix
   ctx.clearRect(0, 0, CW, CH)
-  const body = imageCache[`Body/${p}${cfg.body}.png`]
-  if (body) ctx.drawImage(body, 0, 0, CW, CH)
-  for (const item of cfg.clothes) {
-    const img = imageCache[`Clothes/${p}${item}.png`]
-    if (img) ctx.drawImage(img, 0, 0, CW, CH)
-  }
-  const face = imageCache[`Faces/${p}${cfg.face}.png`]
-  if (face) ctx.drawImage(face, 0, 0, CW, CH)
+  fit(imageCache[`Body/${p}${cfg.body}.png`], ctx)
+  for (const item of cfg.clothes)
+    fit(imageCache[`Clothes/${p}${item}.png`], ctx)
+  fit(imageCache[`Faces/${p}${cfg.face}.png`], ctx)
 }
 
 function loop(t) {
