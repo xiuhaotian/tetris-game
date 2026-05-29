@@ -48,10 +48,11 @@
         </div>
 
         <div class="board-section">
-          <div class="board-frame">
+          <div class="board-frame" :class="{ shake: shaking }">
             <div class="board-glow"></div>
             <canvas ref="gameCanvas" width="320" height="640"></canvas>
             <div class="board-overlay" v-if="!isPlaying"></div>
+            <div class="scanlines"></div>
             <div class="board-corners">
               <span class="corner tl"></span><span class="corner tr"></span>
               <span class="corner bl"></span><span class="corner br"></span>
@@ -139,6 +140,7 @@ const isPlaying = ref(false)
 const combo = ref(0)
 const achievements = ref([])
 const currentLang = ref('zh')
+const shaking = ref(false)
 
 const showComboEffect = ref(false)
 const comboEffectText = ref('')
@@ -249,30 +251,33 @@ const createPiece = () => {
 
 const drawBlock = (context, x, y, color, alpha = 1) => {
   const px = x * BLOCK_SIZE, py = y * BLOCK_SIZE
+  const s = BLOCK_SIZE
   context.save()
   context.globalAlpha = alpha
+
   if (alpha === 1) {
     context.shadowColor = color.glow
-    context.shadowBlur = 12
+    context.shadowBlur = 6
   }
-  const grad = context.createLinearGradient(px, py, px + BLOCK_SIZE, py + BLOCK_SIZE)
-  grad.addColorStop(0, color.light)
-  grad.addColorStop(0.5, color.main)
-  grad.addColorStop(1, color.dark)
-  context.fillStyle = grad
-  context.beginPath()
-  context.roundRect(px + 2, py + 2, BLOCK_SIZE - 4, BLOCK_SIZE - 4, 5)
-  context.fill()
-  if (alpha === 1) {
-    context.fillStyle = 'rgba(255,255,255,0.35)'
-    context.beginPath()
-    context.roundRect(px + 4, py + 4, BLOCK_SIZE - 8, 4, 2)
-    context.fill()
-    context.fillStyle = 'rgba(0,0,0,0.2)'
-    context.beginPath()
-    context.roundRect(px + 4, py + BLOCK_SIZE - 8, BLOCK_SIZE - 8, 4, 2)
-    context.fill()
-  }
+
+  // Main fill
+  context.fillStyle = color.main
+  context.fillRect(px + 1, py + 1, s - 2, s - 2)
+
+  // Pixel highlight (top + left)
+  context.fillStyle = color.light
+  context.fillRect(px + 1, py + 1, s - 2, 2)
+  context.fillRect(px + 1, py + 1, 2, s - 2)
+
+  // Pixel shadow (bottom + right)
+  context.fillStyle = color.dark
+  context.fillRect(px + 1, py + s - 3, s - 2, 2)
+  context.fillRect(px + s - 3, py + 1, 2, s - 2)
+
+  // Inner dimple for retro depth
+  context.fillStyle = 'rgba(255,255,255,0.08)'
+  context.fillRect(px + 5, py + 5, s - 12, s - 12)
+
   context.restore()
 }
 
@@ -280,13 +285,14 @@ const drawBoard = (timestamp) => {
   ctx.fillStyle = '#0a0a15'
   ctx.fillRect(0, 0, BOARD_WIDTH * BLOCK_SIZE, BOARD_HEIGHT * BLOCK_SIZE)
 
-  ctx.strokeStyle = 'rgba(50,50,80,0.3)'
-  ctx.lineWidth = 1
-  for (let i = 0; i <= BOARD_WIDTH; i++) {
-    ctx.beginPath(); ctx.moveTo(i * BLOCK_SIZE, 0); ctx.lineTo(i * BLOCK_SIZE, BOARD_HEIGHT * BLOCK_SIZE); ctx.stroke()
-  }
-  for (let i = 0; i <= BOARD_HEIGHT; i++) {
-    ctx.beginPath(); ctx.moveTo(0, i * BLOCK_SIZE); ctx.lineTo(BOARD_WIDTH * BLOCK_SIZE, i * BLOCK_SIZE); ctx.stroke()
+  // Pixel grid
+  ctx.fillStyle = 'rgba(40,40,70,0.15)'
+  for (let y = 0; y < BOARD_HEIGHT; y++) {
+    for (let x = 0; x < BOARD_WIDTH; x++) {
+      if ((x + y) % 2 === 0) {
+        ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE)
+      }
+    }
   }
 
   for (let y = 0; y < BOARD_HEIGHT; y++)
@@ -301,10 +307,18 @@ const drawBoard = (timestamp) => {
     currentPiece.shape.forEach((row, y) => {
       row.forEach((cell, x) => {
         if (cell) {
+          const gx = (x + currentPiece.x) * BLOCK_SIZE
+          const gy = (y + ghostY) * BLOCK_SIZE
           ctx.save()
-          ctx.strokeStyle = currentPiece.color.main
-          ctx.globalAlpha = 0.35; ctx.lineWidth = 2; ctx.setLineDash([5, 5])
-          ctx.strokeRect((x + currentPiece.x) * BLOCK_SIZE + 4, (y + ghostY) * BLOCK_SIZE + 4, BLOCK_SIZE - 8, BLOCK_SIZE - 8)
+          ctx.globalAlpha = 0.2
+          ctx.fillStyle = currentPiece.color.main
+          ctx.fillRect(gx + 1, gy + 1, BLOCK_SIZE - 2, BLOCK_SIZE - 2)
+          ctx.fillStyle = currentPiece.color.light
+          ctx.fillRect(gx + 1, gy + 1, BLOCK_SIZE - 2, 2)
+          ctx.fillRect(gx + 1, gy + 1, 2, BLOCK_SIZE - 2)
+          ctx.fillStyle = currentPiece.color.dark
+          ctx.fillRect(gx + 1, gy + BLOCK_SIZE - 3, BLOCK_SIZE - 2, 2)
+          ctx.fillRect(gx + BLOCK_SIZE - 3, gy + 1, 2, BLOCK_SIZE - 2)
           ctx.restore()
         }
       })
@@ -323,8 +337,13 @@ const drawBoard = (timestamp) => {
       ctx.save()
       ctx.globalAlpha = p.life
       ctx.translate(p.x, p.y); ctx.rotate(p.rotation)
-      ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 12
-      ctx.beginPath(); ctx.arc(0, 0, p.size * p.life, 0, Math.PI * 2); ctx.fill()
+      ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 8
+      if (p.pixel) {
+        const size = p.size * p.life
+        ctx.fillRect(-size / 2, -size / 2, size, size)
+      } else {
+        ctx.beginPath(); ctx.arc(0, 0, p.size * p.life, 0, Math.PI * 2); ctx.fill()
+      }
       ctx.restore()
       return true
     }
@@ -356,13 +375,15 @@ const drawNextPiece = () => {
     row.forEach((cell, x) => {
       if (cell) {
         const c = nextPiece.color, px = ox + x * bs, py = oy + y * bs
-        nextCtx.shadowColor = c.glow; nextCtx.shadowBlur = 10
-        const g = nextCtx.createLinearGradient(px, py, px + bs, py + bs)
-        g.addColorStop(0, c.light); g.addColorStop(0.5, c.main); g.addColorStop(1, c.dark)
-        nextCtx.fillStyle = g
-        nextCtx.beginPath(); nextCtx.roundRect(px + 1, py + 1, bs - 2, bs - 2, 3); nextCtx.fill()
-        nextCtx.fillStyle = 'rgba(255,255,255,0.3)'
-        nextCtx.beginPath(); nextCtx.roundRect(px + 2, py + 2, bs - 6, 3, 1); nextCtx.fill()
+        nextCtx.shadowColor = c.glow; nextCtx.shadowBlur = 6
+        nextCtx.fillStyle = c.main
+        nextCtx.fillRect(px + 1, py + 1, bs - 2, bs - 2)
+        nextCtx.fillStyle = c.light
+        nextCtx.fillRect(px + 1, py + 1, bs - 2, 2)
+        nextCtx.fillRect(px + 1, py + 1, 2, bs - 2)
+        nextCtx.fillStyle = c.dark
+        nextCtx.fillRect(px + 1, py + bs - 3, bs - 2, 2)
+        nextCtx.fillRect(px + bs - 3, py + 1, 2, bs - 2)
       }
     })
   })
@@ -385,13 +406,14 @@ const mergePiece = () => {
     row.forEach((cell, x) => {
       if (cell) {
         board[y + currentPiece.y][x + currentPiece.x] = currentPiece.color.main
-        for (let i = 0; i < 4; i++)
+        for (let i = 0; i < 6; i++)
           particles.push({
             x: (x + currentPiece.x) * BLOCK_SIZE + BLOCK_SIZE / 2,
             y: (y + currentPiece.y) * BLOCK_SIZE + BLOCK_SIZE / 2,
-            vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8 - 3,
-            size: Math.random() * 5 + 3, color: currentPiece.color.main,
-            life: 1, rotation: 0, rotationSpeed: (Math.random() - 0.5) * 0.2
+            vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 8 - 3,
+            size: Math.random() * 5 + 2, color: currentPiece.color.main,
+            life: 1, rotation: 0, rotationSpeed: (Math.random() - 0.5) * 0.2,
+            pixel: false,
           })
       }
     })
@@ -409,6 +431,27 @@ const clearLines = () => {
     combo.value++
     if (comboTimer) clearTimeout(comboTimer)
     comboTimer = setTimeout(() => combo.value = 0, 2000)
+
+    // Screen shake!
+    shaking.value = true
+    setTimeout(() => shaking.value = false, 250)
+
+    // Pixel particles on line clear
+    for (let i = 0; i < cleared * 20; i++) {
+      const hue = Math.floor(Math.random() * 360)
+      particles.push({
+        x: Math.random() * BOARD_WIDTH * BLOCK_SIZE,
+        y: BOARD_HEIGHT * BLOCK_SIZE + 10,
+        vx: (Math.random() - 0.5) * 12,
+        vy: -Math.random() * 10 - 4,
+        size: Math.random() * 4 + 2,
+        life: 1,
+        rotation: 0,
+        rotationSpeed: (Math.random() - 0.5) * 0.3,
+        color: `hsl(${hue}, 100%, 60%)`,
+        pixel: true,
+      })
+    }
 
     const pointsTable = [0, 100, 300, 500, 800]
     const points = pointsTable[Math.min(cleared, 4)] * level.value * (combo.value > 1 ? combo.value * 0.5 : 1)
@@ -593,6 +636,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* ── Base ── */
 .game-wrapper {
   min-height: 100vh; min-height: 100dvh;
   position: relative; overflow: hidden; background: #050510;
@@ -607,8 +651,9 @@ onUnmounted(() => {
   position: fixed; top: 16px; right: 16px; z-index: 100;
   width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
   background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 50%; cursor: pointer; font-size: 1.2rem;
+  border-radius: 6px; cursor: pointer; font-size: 1.2rem;
   backdrop-filter: blur(12px); transition: 0.2s;
+  image-rendering: pixelated;
 }
 .lang-switch:hover { background: rgba(255,255,255,0.12); transform: scale(1.1); }
 
@@ -620,25 +665,28 @@ onUnmounted(() => {
   width: 100%; max-width: 860px;
   height: 100dvh; max-height: 100dvh;
   box-sizing: border-box;
+  background-image:
+    radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 16px 16px;
 }
 .top-bar { flex-shrink: 0; text-align: center; }
-.title-row { display: flex; align-items: center; gap: 16px; justify-content: center; }
+.title-row { display: flex; align-items: baseline; gap: 14px; justify-content: center; }
 .title {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 2rem; font-weight: 900; margin: 0;
+  font-family: 'ZCOOL QingKe HuangYou', 'PingFang SC', sans-serif;
+  font-size: 2rem; font-weight: 400; margin: 0;
   background: linear-gradient(135deg, #ff6b9d, #c94bff, #6b9dff);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  letter-spacing: 4px;
+  letter-spacing: 6px;
   filter: drop-shadow(0 0 20px rgba(201,75,255,0.3));
 }
 .subtitle {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 0.7rem; color: rgba(255,255,255,0.15); letter-spacing: 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.5rem; color: rgba(255,255,255,0.12); letter-spacing: 2px;
 }
 
 /* ── Main Area ── */
 .main-area {
-  display: flex; gap: 12px; align-items: flex-start;
+  display: flex; gap: 10px; align-items: flex-start;
   flex: 1; min-height: 0; width: 100%;
   justify-content: center;
 }
@@ -654,28 +702,29 @@ onUnmounted(() => {
 .stat {
   position: relative;
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
   transition: border-color 0.2s;
 }
 .stat::before {
   content: ''; position: absolute; top: 0; left: 2px; right: 2px; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
 }
-.stat-icon { font-size: 1.1rem; flex-shrink: 0; filter: saturate(0.8); }
+.stat-icon { font-size: 1rem; flex-shrink: 0; opacity: 0.7; }
 .stat-body { min-width: 0; }
 .stat-label {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 0.5rem; color: rgba(255,255,255,0.3);
-  letter-spacing: 1.5px; display: block; line-height: 1;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 0.55rem; font-weight: 600; color: rgba(255,255,255,0.3);
+  letter-spacing: 2px; display: block; line-height: 1;
 }
 .stat-val {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 1.1rem; font-weight: 700; display: block; line-height: 1.3;
-  letter-spacing: 1px;
+  font-family: 'Press Start 2P', 'Orbitron', monospace;
+  font-size: 0.75rem; font-weight: 400; display: block; line-height: 1.5;
+  letter-spacing: 0.5px;
+  image-rendering: pixelated;
 }
 .score-val { background: linear-gradient(135deg,#ff6b9d,#ff9dbd); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .level-val { background: linear-gradient(135deg,#6b9dff,#9dbbff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
@@ -683,12 +732,12 @@ onUnmounted(() => {
 .high-val { background: linear-gradient(135deg,#ffd700,#ffed4a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 
 .combo-badge {
-  text-align: center; padding: 4px 8px;
-  background: linear-gradient(135deg, rgba(255,107,157,0.15), rgba(201,75,255,0.15));
+  text-align: center; padding: 3px 6px;
+  background: rgba(255,107,157,0.1);
   border: 1px solid rgba(255,107,157,0.2);
-  border-radius: 6px;
-  font-family: 'Orbitron', sans-serif;
-  font-size: 0.85rem; font-weight: 700;
+  border-radius: 4px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.6rem; font-weight: 400;
   color: #ff6b9d;
   animation: pulse 0.5s ease-in-out infinite;
 }
@@ -697,33 +746,58 @@ onUnmounted(() => {
 .board-section { position: relative; flex-shrink: 0; }
 .board-frame {
   position: relative; width: 328px; height: 648px; padding: 3px;
-  background: linear-gradient(135deg, rgba(201,75,255,0.4), rgba(107,157,255,0.4));
-  border-radius: 12px; overflow: hidden;
+  background: linear-gradient(135deg, rgba(201,75,255,0.35), rgba(107,157,255,0.35));
+  border-radius: 10px; overflow: hidden;
 }
 .board-glow {
   position: absolute; inset: -3px;
   background: linear-gradient(45deg, #ff6b9d, #c94bff, #6b9dff, #ff6b9d);
-  background-size: 300% 300%; border-radius: 15px; z-index: -1;
-  opacity: 0.25; filter: blur(20px);
+  background-size: 300% 300%; border-radius: 13px; z-index: -1;
+  opacity: 0.25; filter: blur(15px);
   animation: borderGlow 4s ease-in-out infinite;
 }
 @keyframes borderGlow {
-  0%,100% { background-position: 0% 50%; opacity: 0.2; }
-  50% { background-position: 100% 50%; opacity: 0.5; }
+  0%,100% { background-position: 0% 50%; opacity: 0.15; }
+  50% { background-position: 100% 50%; opacity: 0.4; }
 }
-.board-frame canvas { display: block; border-radius: 9px; background: #0a0a15; width: 100%; height: 100%; }
+.board-frame canvas { display: block; border-radius: 7px; background: #0a0a15; width: 100%; height: 100%; }
 .board-corners { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 .corner {
-  position: absolute; width: 12px; height: 12px;
-  border-color: rgba(201,75,255,0.6); border-style: solid;
+  position: absolute; width: 14px; height: 14px;
+  border-color: rgba(201,75,255,0.5); border-style: solid;
 }
-.corner.tl { top: 5px; left: 5px; border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
-.corner.tr { top: 5px; right: 5px; border-width: 2px 2px 0 0; border-radius: 0 4px 0 0; }
-.corner.bl { bottom: 5px; left: 5px; border-width: 0 0 2px 2px; border-radius: 0 0 0 4px; }
-.corner.br { bottom: 5px; right: 5px; border-width: 0 2px 2px 0; border-radius: 0 0 4px 0; }
+.corner.tl { top: 4px; left: 4px; border-width: 2px 0 0 2px; }
+.corner.tr { top: 4px; right: 4px; border-width: 2px 2px 0 0; }
+.corner.bl { bottom: 4px; left: 4px; border-width: 0 0 2px 2px; }
+.corner.br { bottom: 4px; right: 4px; border-width: 0 2px 2px 0; }
+
+/* Scanline overlay */
+.scanlines {
+  position: absolute; inset: 3px; border-radius: 7px;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px, rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px
+  );
+  pointer-events: none; z-index: 3;
+}
+
 .board-overlay {
   position: absolute; inset: 3px; background: rgba(0,0,0,0.75);
-  border-radius: 9px; z-index: 5; backdrop-filter: blur(4px);
+  border-radius: 7px; z-index: 5; backdrop-filter: blur(4px);
+}
+
+/* Screen shake */
+.board-frame.shake {
+  animation: screenShake 0.25s ease-out;
+}
+@keyframes screenShake {
+  0%   { transform: translate(0, 0); }
+  15%  { transform: translate(-5px, 1px); }
+  30%  { transform: translate(4px, -2px); }
+  45%  { transform: translate(-3px, 2px); }
+  60%  { transform: translate(2px, -1px); }
+  75%  { transform: translate(-1px, 1px); }
+  90%  { transform: translate(1px, 0); }
+  100% { transform: translate(0, 0); }
 }
 
 .start-btn-wrap {
@@ -732,92 +806,92 @@ onUnmounted(() => {
 }
 .start-btn {
   position: relative;
-  padding: 14px 32px; border-radius: 6px; border: 1px solid rgba(201,75,255,0.4);
-  background: linear-gradient(135deg, rgba(201,75,255,0.2), rgba(107,157,255,0.2));
+  padding: 12px 28px; border-radius: 6px; border: 2px solid rgba(201,75,255,0.5);
+  background: rgba(10,10,21,0.85);
   color: white;
-  font-family: 'Orbitron', sans-serif;
-  font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.65rem; font-weight: 400; cursor: pointer;
   display: flex; align-items: center; gap: 10px;
   backdrop-filter: blur(8px); transition: all 0.25s;
-  text-transform: uppercase; letter-spacing: 2px;
-  box-shadow: 0 0 20px rgba(201,75,255,0.1), inset 0 1px 0 rgba(255,255,255,0.08);
+  letter-spacing: 1px;
+  box-shadow: 0 0 20px rgba(201,75,255,0.15), inset 0 0 0 1px rgba(255,255,255,0.06);
 }
 .start-btn:hover {
-  transform: scale(1.05);
-  border-color: rgba(201,75,255,0.7);
-  box-shadow: 0 0 30px rgba(201,75,255,0.25), inset 0 1px 0 rgba(255,255,255,0.12);
+  transform: scale(1.06);
+  border-color: rgba(201,75,255,0.8);
+  box-shadow: 0 0 30px rgba(201,75,255,0.3), inset 0 0 0 1px rgba(255,255,255,0.1);
 }
-.start-btn:active { transform: scale(0.97); }
-.btn-symbol { font-size: 1.1rem; }
+.start-btn:active { transform: scale(0.95); }
+.btn-symbol { font-size: 0.8rem; }
 
 /* ── Right Panel ── */
 .panel-label {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 0.55rem; color: rgba(255,255,255,0.25);
-  letter-spacing: 2px; margin-bottom: 6px; text-align: center;
-  text-transform: uppercase;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 0.55rem; font-weight: 600; color: rgba(255,255,255,0.2);
+  letter-spacing: 2px; margin-bottom: 4px; text-align: center;
 }
 
 .next-box { text-align: center; }
 .next-frame {
-  display: inline-block; border-radius: 8px;
+  display: inline-block; border-radius: 6px;
   border: 1px solid rgba(255,255,255,0.06); overflow: hidden;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.3);
 }
 .next-frame canvas { display: block; }
 
 .char-box { text-align: center; }
 .char-canvas-wrap { display: flex; justify-content: center; }
-.char-selector { display: flex; justify-content: center; gap: 4px; margin-top: 4px; }
+.char-selector { display: flex; justify-content: center; gap: 3px; margin-top: 3px; }
 .char-btn {
-  padding: 3px 10px; border-radius: 4px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.35);
-  font-family: 'Orbitron', sans-serif;
-  font-size: 0.55rem; cursor: pointer; transition: all 0.2s;
-  font-weight: 600; letter-spacing: 0.5px;
+  padding: 2px 8px; border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02); color: rgba(255,255,255,0.3);
+  font-family: 'ZCOOL QingKe HuangYou', 'PingFang SC', sans-serif;
+  font-size: 0.65rem; cursor: pointer; transition: all 0.2s;
+  letter-spacing: 1px;
 }
 .char-btn:hover {
-  background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.6);
-  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5);
+  border-color: rgba(255,255,255,0.15);
 }
 .char-btn.active {
-  background: linear-gradient(135deg, rgba(201,75,255,0.2), rgba(107,157,255,0.2));
-  border-color: rgba(201,75,255,0.4); color: white;
-  box-shadow: 0 0 12px rgba(201,75,255,0.1);
+  background: rgba(201,75,255,0.15);
+  border-color: rgba(201,75,255,0.4); color: #fff;
+  box-shadow: 0 0 10px rgba(201,75,255,0.15);
 }
+
 .ctrl-box {}
 .ctrl-grid { display: flex; flex-direction: column; gap: 2px; }
 .ctrl-item {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 3px 6px;
+  padding: 2px 6px;
   background: rgba(255,255,255,0.02);
-  border-radius: 4px;
+  border-radius: 3px;
 }
-.ctrl-item:last-child { border-bottom: none; }
 .key-cap {
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: 28px; height: 20px; padding: 0 6px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 3px;
-  font-family: 'Orbitron', sans-serif;
-  font-size: 0.6rem; color: rgba(255,255,255,0.5);
+  min-width: 26px; height: 18px; padding: 0 5px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 2px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.45rem; color: rgba(255,255,255,0.4);
   box-shadow: inset 0 -1.5px 0 rgba(0,0,0,0.3);
 }
 .ctrl-item span:last-child {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 0.55rem; color: rgba(255,255,255,0.3);
-  letter-spacing: 0.5px;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 0.55rem; font-weight: 500; color: rgba(255,255,255,0.25);
+  letter-spacing: 1px;
 }
 
-.achieve-box { display: flex; flex-direction: column; gap: 3px; }
+.achieve-box { display: flex; flex-direction: column; gap: 2px; }
 .achieve-item {
-  padding: 4px 8px;
-  background: linear-gradient(135deg, rgba(255,215,0,0.06), rgba(255,215,0,0.02));
-  border: 1px solid rgba(255,215,0,0.15); border-radius: 4px;
-  font-size: 0.6rem; color: rgba(255,215,0,0.7); text-align: center;
-  font-weight: 600;
+  padding: 3px 6px;
+  background: rgba(255,215,0,0.06);
+  border: 1px solid rgba(255,215,0,0.12);
+  border-radius: 3px;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 0.5rem; font-weight: 600; color: rgba(255,215,0,0.6); text-align: center;
   animation: pop 0.3s ease-out;
 }
 @keyframes pop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
@@ -832,19 +906,19 @@ onUnmounted(() => {
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .go-content { text-align: center; }
 .go-title {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 2.2rem; font-weight: 900; color: #c41e3a;
-  margin-bottom: 16px; text-shadow: 0 0 40px rgba(196,30,58,0.5);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 1.8rem; font-weight: 400; color: #c41e3a;
+  margin-bottom: 16px;
   letter-spacing: 4px;
 }
 .go-score {
-  font-family: 'Orbitron', sans-serif;
-  color: rgba(255,255,255,0.35); font-size: 0.75rem;
+  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: rgba(255,255,255,0.3); font-size: 0.7rem;
   letter-spacing: 2px; margin-bottom: 8px;
 }
 .go-num {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 2.5rem; font-weight: 900;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 2rem; font-weight: 400;
   background: linear-gradient(135deg,#ffd700,#ffed4a);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   filter: drop-shadow(0 0 20px rgba(255,215,0,0.3));
@@ -856,8 +930,8 @@ onUnmounted(() => {
   animation: comboAnim 0.8s ease-out forwards; pointer-events: none;
 }
 .combo-text {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 2.5rem; font-weight: 900;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 1.5rem; font-weight: 400;
   background: linear-gradient(135deg,#ff6b9d,#c94bff,#6b9dff);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   text-shadow: 0 0 40px rgba(201,75,255,0.5);
@@ -876,30 +950,30 @@ onUnmounted(() => {
   .game-container { max-width: 100%; padding: 6px 10px; overflow-x: hidden; }
   .main-area { flex-direction: column; align-items: center; gap: 6px; }
   .left-panel { width: auto; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 3px; order: 1; }
-  .left-panel .stat { padding: 5px 8px; gap: 5px; }
-  .left-panel .stat-icon { font-size: 0.85rem; }
-  .left-panel .stat-val { font-size: 0.85rem; }
+  .left-panel .stat { padding: 4px 7px; gap: 5px; }
+  .left-panel .stat-icon { font-size: 0.8rem; }
+  .left-panel .stat-val { font-size: 0.6rem; }
   .left-panel .stat-label { font-size: 0.5rem; }
-  .right-panel { order: 2; width: auto; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 6px; }
+  .right-panel { order: 2; width: auto; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 4px; }
   .right-panel .next-box { display: none; }
   .right-panel .ctrl-box { display: none; }
   .right-panel .achieve-box { display: none; }
   .board-section { order: 3; }
 }
 @media (max-width: 600px) {
-  .title { font-size: 1.3rem; letter-spacing: 2px; }
+  .title { font-size: 1.2rem; letter-spacing: 3px; }
   .subtitle { display: none; }
   .lang-switch { top: 8px; right: 8px; width: 34px; height: 34px; font-size: 1rem; }
   .game-container { gap: 4px; padding: 4px 6px; }
-  .stat { padding: 3px 6px; }
-  .stat-val { font-size: 0.75rem; }
-  .go-title { font-size: 1.6rem; }
-  .go-num { font-size: 1.6rem; }
+  .stat { padding: 3px 5px; }
+  .stat-val { font-size: 0.55rem; }
+  .go-title { font-size: 1.2rem; }
+  .go-num { font-size: 1.4rem; }
   .board-section { flex: 1; min-height: 0; display: flex; justify-content: center; }
   .board-frame { height: 100%; width: auto; aspect-ratio: 328 / 648; }
   .board-frame canvas { width: 100%; height: 100%; display: block; }
   .right-panel { align-items: center; gap: 4px; }
   .char-box :deep(.char-canvas) { width: 120px; height: auto; }
-  .char-btn { font-size: 0.5rem; padding: 2px 7px; }
+  .char-btn { font-size: 0.55rem; padding: 2px 6px; }
 }
 </style>
